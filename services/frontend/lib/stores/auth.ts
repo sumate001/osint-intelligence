@@ -24,7 +24,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "osintdesk-auth",
-      partialize: (state) => ({ token: state.token, userId: state.userId, role: state.role }),
+      // persist all auth fields so isAuthenticated survives refresh
+      partialize: (state) => ({
+        token: state.token,
+        userId: state.userId,
+        role: state.role,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 );

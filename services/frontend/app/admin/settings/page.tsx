@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useAdminSettings, useSaveSettings, useAdminUsers, useCreateUser, useUpdateUser, useDeleteUser, useServiceHealth, useSystemLogs } from "@/lib/hooks/useAdmin";
+import { useAdminSettings, useSaveSettings, useAdminUsers, useCreateUser, useUpdateUser, useDeleteUser, useServiceHealth, useSystemLogs, useSystemVersion, useCheckForUpdates } from "@/lib/hooks/useAdmin";
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils/cn";
 import type { AdminSettings, SettingsPatch, AdminUser, UserCreate } from "@/lib/api/admin";
@@ -657,27 +657,111 @@ function RolesSection() {
 }
 
 // ─── SECTION: Service Health ─────────────────────────────────────────────────
+function VersionCard({ onUpdate }: { onUpdate: () => void }) {
+  const { data: ver, isLoading } = useSystemVersion();
+  const checkMut = useCheckForUpdates();
+
+  const behind = ver?.commits_behind ?? null;
+  const upToDate = ver?.is_up_to_date;
+  const checked = ver?.is_up_to_date !== null && ver?.remote_commit !== null;
+
+  const statusColor = !checked ? "text-[var(--text-3)]"
+    : upToDate ? "text-[var(--green)]"
+    : "text-[var(--red)]";
+
+  const statusLabel = !checked ? "—"
+    : upToDate ? "✓ Up to date"
+    : `${behind} commit${behind === 1 ? "" : "s"} behind`;
+
+  return (
+    <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface-2)] border-b border-[var(--border)]">
+        <span className="text-xs font-semibold text-[var(--text)] uppercase tracking-wide">System Version</span>
+        <div className="flex items-center gap-2">
+          {checked && (
+            <span className={cn("text-xs font-medium", statusColor)}>{statusLabel}</span>
+          )}
+          <button
+            onClick={() => checkMut.mutate()}
+            disabled={checkMut.isPending}
+            className={cn(ghostBtn, "text-[10px] py-1")}
+          >
+            <RefreshCw size={11} className={checkMut.isPending ? "animate-spin" : ""} />
+            {checkMut.isPending ? "Checking..." : "Check for updates"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 divide-x divide-[var(--border)]">
+        {/* Local */}
+        <div className="p-4 space-y-1">
+          <p className="text-[10px] text-[var(--text-3)] uppercase tracking-wide mb-2">Current (local)</p>
+          {isLoading ? (
+            <div className="text-[var(--text-3)] text-xs">Loading...</div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm font-bold text-[var(--accent)]">{ver?.local_commit ?? "—"}</span>
+              </div>
+              <p className="text-xs text-[var(--text-2)] line-clamp-1">{ver?.local_message}</p>
+              <p className="text-[10px] text-[var(--text-3)] font-mono">
+                {ver?.local_date ? new Date(ver.local_date).toLocaleDateString("th-TH", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—"}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Remote */}
+        <div className="p-4 space-y-1">
+          <p className="text-[10px] text-[var(--text-3)] uppercase tracking-wide mb-2">Latest on GitHub</p>
+          {!checked ? (
+            <p className="text-xs text-[var(--text-3)] italic">Click "Check for updates"</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <span className={cn("font-mono text-sm font-bold", upToDate ? "text-[var(--green)]" : "text-[var(--yellow)]")}>
+                  {ver?.remote_commit ?? "—"}
+                </span>
+                {!upToDate && (
+                  <span className="text-[9px] bg-[var(--yellow)]/15 text-[var(--yellow)] px-1.5 py-0.5 rounded font-medium">
+                    NEW
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-2)] line-clamp-1">{ver?.remote_message}</p>
+              <p className="text-[10px] text-[var(--text-3)] font-mono">
+                {ver?.remote_date ? new Date(ver.remote_date).toLocaleDateString("th-TH", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—"}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Update button shown only when behind */}
+      {checked && !upToDate && (
+        <div className="px-4 py-3 bg-[var(--yellow)]/5 border-t border-[var(--yellow)]/20 flex items-center justify-between">
+          <p className="text-xs text-[var(--yellow)]">
+            {behind} new commit{behind === 1 ? "" : "s"} available on GitHub
+          </p>
+          <button
+            onClick={onUpdate}
+            className="flex items-center gap-2 bg-[var(--accent)] text-white text-xs px-3 py-1.5 rounded-lg hover:opacity-90"
+          >
+            <Download size={12} />
+            Update Now
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HealthSection() {
   const { data: services = [], isLoading, refetch, isFetching } = useServiceHealth();
   const [showUpdate, setShowUpdate] = useState(false);
   return (
     <div className="space-y-4">
-      {/* Update button */}
-      <div className="flex items-center gap-3 p-4 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-[var(--text)]">Update System</p>
-          <p className="text-xs text-[var(--text-3)] mt-0.5">
-            Pull latest code from GitHub, rebuild images, and restart services.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowUpdate(true)}
-          className="flex items-center gap-2 bg-[var(--accent)] text-white text-sm px-4 py-2 rounded-lg hover:opacity-90 shrink-0"
-        >
-          <Download size={14} />
-          Update
-        </button>
-      </div>
+      <VersionCard onUpdate={() => setShowUpdate(true)} />
 
       {showUpdate && <UpdateModal onClose={() => setShowUpdate(false)} />}
 

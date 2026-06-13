@@ -122,6 +122,21 @@ export interface ServiceHealth {
 }
 export const getServiceHealth = () => apiFetch<ServiceHealth[]>("/api/v1/admin/health");
 
+// ─── System Version ─────────────────────────────────────────────────────────
+export interface SystemVersion {
+  local_commit: string;
+  local_long: string;
+  local_message: string;
+  local_date: string;
+  remote_commit: string | null;
+  remote_message: string | null;
+  remote_date: string | null;
+  commits_behind: number | null;
+  is_up_to_date: boolean | null;
+}
+export const getSystemVersion = (checkRemote = false) =>
+  apiFetch<SystemVersion>(`/api/v1/admin/system/version?check_remote=${checkRemote}`);
+
 // ─── Logs ──────────────────────────────────────────────────────────────────
 export interface LogEntry {
   id: number; timestamp: string; level: string; service: string; message: string;

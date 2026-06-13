@@ -57,3 +57,19 @@ export function useSystemLogs(params?: { service?: string; level?: string }) {
     refetchInterval: 15_000,
   });
 }
+
+export function useSystemVersion() {
+  return useQuery({
+    queryKey: ["system-version"],
+    queryFn: () => api.getSystemVersion(false),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCheckForUpdates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.getSystemVersion(true),
+    onSuccess: (data) => qc.setQueryData(["system-version"], data),
+  });
+}

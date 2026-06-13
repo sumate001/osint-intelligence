@@ -75,6 +75,57 @@ async def service_health(db: AsyncSession = Depends(get_db), _: dict = _admin):
     return await service.check_health(settings)
 
 
+@router.get("/system/version")
+async def system_version(
+    check_remote: bool = Query(False, description="Fetch origin and compare with remote"),
+    _: dict = _admin,
+):
+    """Return local git commit info. Pass check_remote=true to compare with GitHub."""
+
+    async def git(*args: str) -> str:
+        proc = await asyncio.create_subprocess_exec(
+            "git", "-C", "/repo", *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        out, _ = await proc.communicate()
+        return out.decode().strip()
+
+    local_commit  = await git("rev-parse", "--short", "HEAD")
+    local_long    = await git("rev-parse", "HEAD")
+    local_message = await git("log", "-1", "--pretty=%s")
+    local_date    = await git("log", "-1", "--pretty=%cI")
+
+    result: dict = {
+        "local_commit": local_commit,
+        "local_long": local_long,
+        "local_message": local_message,
+        "local_date": local_date,
+        "remote_commit": None,
+        "remote_message": None,
+        "remote_date": None,
+        "commits_behind": None,
+        "is_up_to_date": None,
+    }
+
+    if check_remote:
+        await git("fetch", "origin", "--quiet")
+        remote_commit  = await git("rev-parse", "--short", "origin/main")
+        remote_long    = await git("rev-parse", "origin/main")
+        remote_message = await git("log", "-1", "--pretty=%s", "origin/main")
+        remote_date    = await git("log", "-1", "--pretty=%cI", "origin/main")
+        behind_str     = await git("rev-list", "--count", "HEAD..origin/main")
+        behind         = int(behind_str) if behind_str.isdigit() else 0
+
+        result["remote_commit"]  = remote_commit
+        result["remote_message"] = remote_message
+        result["remote_date"]    = remote_date
+        result["commits_behind"] = behind
+        result["is_up_to_date"]  = (local_long == remote_long)
+
+    return result
+
+
 @router.get("/system/update/stream")
 async def stream_system_update(current_user: dict = Depends(require_role(Role.ADMIN))):
     """Stream git pull + docker rebuild + restart output to frontend via SSE."""
