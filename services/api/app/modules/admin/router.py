@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import shutil
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -75,21 +77,52 @@ async def service_health(db: AsyncSession = Depends(get_db), _: dict = _admin):
     return await service.check_health(settings)
 
 
+_REPO = "/repo"
+
+
+async def _cmd(*args: str, env: dict | None = None) -> tuple[str, int]:
+    """Run a command, return (combined stdout+stderr, returncode)."""
+    merged_env = {**os.environ, **(env or {})}
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        env=merged_env,
+    )
+    out, _ = await proc.communicate()
+    return out.decode().strip(), proc.returncode or 0
+
+
+def _preflight_errors() -> list[str]:
+    """Return list of setup problems that would cause the update to fail."""
+    errors = []
+    if not os.path.isdir(_REPO):
+        errors.append("❌  /repo not mounted — add '- ./:/repo' to docker-compose.dev.yml volumes and recreate the api container")
+    if not os.path.exists("/var/run/docker.sock"):
+        errors.append("❌  Docker socket not mounted — add '- /var/run/docker.sock:/var/run/docker.sock' and recreate the api container")
+    if not shutil.which("git"):
+        errors.append("❌  git not found — rebuild the api image (docker compose up -d --build api)")
+    if not shutil.which("docker-compose") and not shutil.which("docker"):
+        errors.append("❌  docker / docker-compose not found — rebuild the api image (docker compose up -d --build api)")
+    return errors
+
+
 @router.get("/system/version")
 async def system_version(
     check_remote: bool = Query(False, description="Fetch origin and compare with remote"),
     _: dict = _admin,
 ):
     """Return local git commit info. Pass check_remote=true to compare with GitHub."""
+    if not os.path.isdir(_REPO) or not shutil.which("git"):
+        return {
+            "local_commit": "n/a", "local_long": "", "local_message": "git not available (container not rebuilt yet)",
+            "local_date": "", "remote_commit": None, "remote_message": None,
+            "remote_date": None, "commits_behind": None, "is_up_to_date": None,
+        }
 
     async def git(*args: str) -> str:
-        proc = await asyncio.create_subprocess_exec(
-            "git", "-C", "/repo", *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        out, _ = await proc.communicate()
-        return out.decode().strip()
+        out, _ = await _cmd("git", "-C", _REPO, *args)
+        return out
 
     local_commit  = await git("rev-parse", "--short", "HEAD")
     local_long    = await git("rev-parse", "HEAD")
@@ -97,7 +130,7 @@ async def system_version(
     local_date    = await git("log", "-1", "--pretty=%cI")
 
     result: dict = {
-        "local_commit": local_commit,
+        "local_commit": local_commit or "n/a",
         "local_long": local_long,
         "local_message": local_message,
         "local_date": local_date,
@@ -116,12 +149,13 @@ async def system_version(
         remote_date    = await git("log", "-1", "--pretty=%cI", "origin/main")
         behind_str     = await git("rev-list", "--count", "HEAD..origin/main")
         behind         = int(behind_str) if behind_str.isdigit() else 0
-
-        result["remote_commit"]  = remote_commit
-        result["remote_message"] = remote_message
-        result["remote_date"]    = remote_date
-        result["commits_behind"] = behind
-        result["is_up_to_date"]  = (local_long == remote_long)
+        result.update({
+            "remote_commit": remote_commit,
+            "remote_message": remote_message,
+            "remote_date": remote_date,
+            "commits_behind": behind,
+            "is_up_to_date": (local_long == remote_long),
+        })
 
     return result
 
@@ -133,45 +167,58 @@ async def stream_system_update(current_user: dict = Depends(require_role(Role.AD
     def evt(data: dict) -> str:
         return f"data: {json.dumps(data)}\n\n"
 
-    async def run(cmd: list[str]) -> tuple[asyncio.subprocess.Process, list[str]]:
+    # Determine compose binary
+    compose_bin = shutil.which("docker-compose") or "docker-compose"
+    compose_cmd = [compose_bin, "-f", f"{_REPO}/docker-compose.dev.yml"]
+
+    async def generate():
+        # ── Preflight ───────────────────────────────────────────────────────
+        errors = _preflight_errors()
+        if errors:
+            for e in errors:
+                yield evt({"line": e, "error": True})
+            yield evt({"line": "💡 Run: docker compose -f docker-compose.dev.yml up -d --build api", "error": True})
+            return
+
+        # ── Phase 1: git pull ───────────────────────────────────────────────
+        yield evt({"line": "📦 Pulling latest code from GitHub..."})
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
+            "git", "-C", _REPO, "pull", "origin", "main",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
-        return proc
-
-    async def generate():
-        # ── Phase 1: git pull ───────────────────────────────────────────────
-        yield evt({"line": "📦 Pulling latest code from GitHub..."})
-        proc = await run(["git", "-C", "/repo", "pull", "origin", "main"])
         async for raw in proc.stdout:
-            yield evt({"line": raw.decode().rstrip()})
+            line = raw.decode().rstrip()
+            if line:
+                yield evt({"line": line})
         await proc.wait()
         if proc.returncode != 0:
             yield evt({"line": f"❌ git pull failed (exit {proc.returncode})", "error": True})
             return
+        yield evt({"line": "✓ Code updated"})
 
-        # ── Phase 2: build images ───────────────────────────────────────────
-        yield evt({"line": "🔨 Building updated images (this may take a few minutes)..."})
-        proc2 = await run([
-            "docker-compose", "-f", "/repo/docker-compose.dev.yml",
-            "build", "--no-cache", "api", "frontend", "worker", "beat",
-        ])
+        # ── Phase 2: build (with cache — only changed layers rebuild) ───────
+        yield evt({"line": "🔨 Building images (using cache — only changed layers rebuild)..."})
+        proc2 = await asyncio.create_subprocess_exec(
+            *compose_cmd, "build", "api", "frontend", "worker", "beat",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env={**os.environ, "DOCKER_BUILDKIT": "1", "COMPOSE_DOCKER_CLI_BUILD": "1"},
+        )
         async for raw in proc2.stdout:
-            yield evt({"line": raw.decode().rstrip()})
+            line = raw.decode().rstrip()
+            if line:
+                yield evt({"line": line})
         await proc2.wait()
         if proc2.returncode != 0:
             yield evt({"line": f"❌ Build failed (exit {proc2.returncode})", "error": True})
             return
+        yield evt({"line": "✓ Build complete"})
 
         # ── Phase 3: restart (API will go offline) ─────────────────────────
-        yield evt({"line": "🔄 Restarting services... API will go offline in a moment.", "restarting": True})
-        await asyncio.create_subprocess_exec(
-            "docker-compose", "-f", "/repo/docker-compose.dev.yml",
-            "up", "-d", "--no-build",
-        )
-        await asyncio.sleep(3)
+        yield evt({"line": "🔄 Restarting services... connection will drop momentarily.", "restarting": True})
+        await asyncio.create_subprocess_exec(*compose_cmd, "up", "-d", "--no-build")
+        await asyncio.sleep(2)
         yield evt({"line": "__RESTARTING__", "restarting": True})
 
     return StreamingResponse(
