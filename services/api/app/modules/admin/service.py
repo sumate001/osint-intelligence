@@ -125,25 +125,63 @@ async def delete_user(db: AsyncSession, user_id: str, actor_id: str) -> None:
 
 
 async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
-    env = get_settings()
-    checks: list[tuple[str, str]] = [
-        ("PostgreSQL", env.postgres_url.replace("+asyncpg", "").split("@")[-1]),
-        ("Redis", env.redis_url),
-        ("Ollama", f"{settings_merged.ai.ollama_base_url}/api/tags"),
-        ("Meilisearch", f"{settings_merged.databases.meilisearch_url}/health"),
-        ("MinIO", f"{settings_merged.storage.minio_endpoint}/minio/health/live"),
-        ("SearXNG", f"{settings_merged.searxng.url}/healthz"),
-        ("Perplexica", f"{settings_merged.perplexica.url}/api/health"),
-        ("SpiderFoot", f"{settings_merged.spiderfoot.url}/api/v1/ping" if settings_merged.spiderfoot.url else ""),
-        ("MiroFish", f"{settings_merged.mirofish.url}/health" if settings_merged.mirofish.url else ""),
-        ("n8n", f"{settings_merged.n8n.url}/healthz" if settings_merged.n8n.url else ""),
-    ]
-
     results: list[ServiceHealth] = []
+
+    # ── PostgreSQL: check via SQLAlchemy ────────────────────────────────────
+    try:
+        from sqlalchemy import text
+        from ...core.db import AsyncSessionLocal
+        async with AsyncSessionLocal() as s:
+            await s.execute(text("SELECT 1"))
+        results.append(ServiceHealth(name="PostgreSQL", status="ok"))
+    except Exception as exc:
+        results.append(ServiceHealth(name="PostgreSQL", status="error", detail=str(exc)[:120]))
+
+    # ── Redis: check via native ping ────────────────────────────────────────
+    try:
+        import redis.asyncio as aioredis
+        env = get_settings()
+        r = aioredis.from_url(env.redis_url)
+        await r.ping()
+        await r.aclose()
+        results.append(ServiceHealth(name="Redis", status="ok"))
+    except Exception as exc:
+        results.append(ServiceHealth(name="Redis", status="error", detail=str(exc)[:120]))
+
+    # ── Core compose services: always use Docker-internal hostnames ─────────
+    # (from inside the api container, `localhost` is the container itself —
+    #  these service names resolve via the compose Docker network)
+    core_http: list[tuple[str, str]] = [
+        ("Ollama",       f"{settings_merged.ai.ollama_base_url}/api/tags"),
+        ("Meilisearch",  "http://meilisearch:7700/health"),
+        ("MinIO",        "http://minio:9000/minio/health/live"),
+        ("SearXNG",      "http://searxng:8080/"),
+        ("Neo4j",        "http://neo4j:7474"),
+    ]
     async with httpx.AsyncClient(timeout=3.0) as client:
-        for name, url in checks:
-            if not url or url.startswith("postgresql") or url.startswith("redis"):
-                results.append(ServiceHealth(name=name, status="unknown", detail="not checked via HTTP"))
+        for name, url in core_http:
+            t0 = time.monotonic()
+            try:
+                resp = await client.get(url)
+                latency = round((time.monotonic() - t0) * 1000, 1)
+                if resp.status_code < 400:
+                    results.append(ServiceHealth(name=name, status="ok", latency_ms=latency))
+                else:
+                    results.append(ServiceHealth(name=name, status="error", latency_ms=latency, detail=f"HTTP {resp.status_code}"))
+            except Exception as exc:
+                latency = round((time.monotonic() - t0) * 1000, 1)
+                results.append(ServiceHealth(name=name, status="error", latency_ms=latency, detail=str(exc)[:120]))
+
+        # ── Optional add-ons: only check if configured (non-localhost URL) ──
+        optional: list[tuple[str, str]] = [
+            ("Perplexica", f"{settings_merged.perplexica.url}/api/health"),
+            ("SpiderFoot", f"{settings_merged.spiderfoot.url}/api/v1/ping"),
+            ("MiroFish",   f"{settings_merged.mirofish.url}/health"),
+            ("n8n",        f"{settings_merged.n8n.url}/healthz"),
+        ]
+        for name, url in optional:
+            if not url or "localhost" in url or "127.0.0.1" in url:
+                results.append(ServiceHealth(name=name, status="unknown", detail="not configured"))
                 continue
             t0 = time.monotonic()
             try:
@@ -157,23 +195,18 @@ async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
                 latency = round((time.monotonic() - t0) * 1000, 1)
                 results.append(ServiceHealth(name=name, status="error", latency_ms=latency, detail=str(exc)[:120]))
 
-    # Check Celery separately
+    # ── Celery: check worker presence ───────────────────────────────────────
     try:
         from ...worker import celery_app
         active = celery_app.control.inspect(timeout=2).active()
-        results.append(ServiceHealth(name="Celery", status="ok" if active else "error", detail=f"{len(active or {})} worker(s)"))
+        worker_count = len(active or {})
+        results.append(ServiceHealth(
+            name="Celery",
+            status="ok" if worker_count > 0 else "error",
+            detail=f"{worker_count} worker(s) active",
+        ))
     except Exception as exc:
         results.append(ServiceHealth(name="Celery", status="error", detail=str(exc)[:80]))
-
-    # Check Postgres via SQLAlchemy
-    try:
-        from sqlalchemy import text
-        from ...core.db import AsyncSessionLocal
-        async with AsyncSessionLocal() as s:
-            await s.execute(text("SELECT 1"))
-        results[0] = ServiceHealth(name="PostgreSQL", status="ok")
-    except Exception as exc:
-        results[0] = ServiceHealth(name="PostgreSQL", status="error", detail=str(exc)[:80])
 
     return results
 
