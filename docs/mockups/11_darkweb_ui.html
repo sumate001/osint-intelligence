@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OSINT//DESK — Dark Web Intelligence</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0D0F14;--sf:#13161D;--sf2:#191D26;--sf3:#1F2330;
+  --bd:#232838;--bd2:#2C3347;
+  --t:#C9D1E0;--t2:#7A869A;--t3:#445068;
+  --ac:#4B7BEC;--ac-d:#1A2B4A;
+  --gn:#1E8449;--gn-d:#0D2318;
+  --yw:#B7860D;--yw-d:#2A1F08;
+  --rd:#C0392B;--rd-d:#2A1010;
+  --pu:#7D3C98;--pu-d:#2A1040;
+  --dw:#2C3E50;--dw-s:#7FB3D3; /* dark web accent */
+  --mono:'IBM Plex Mono',monospace;
+  --thai:'Noto Sans Thai',sans-serif;
+}
+body{background:var(--bg);color:var(--t);font-family:var(--thai);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+.tb{height:44px;border-bottom:1px solid var(--bd);background:var(--sf);display:flex;align-items:center;padding:0 20px;gap:10px;flex-shrink:0}
+.logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.ld{width:7px;height:7px;border-radius:50%;background:var(--dw-s)}
+.tb-badge{font-size:9px;padding:2px 8px;border-radius:3px;background:var(--dw);color:var(--dw-s);font-family:var(--mono);border:1px solid var(--dw-s)}
+.legal-notice{margin-left:12px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--yw);font-family:var(--mono);padding:4px 10px;background:var(--yw-d);border:1px solid var(--yw-d);border-radius:4px}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tor-status{display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);padding:4px 10px;border-radius:4px;background:var(--sf2);border:1px solid var(--bd2)}
+.tor-dot{width:6px;height:6px;border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.main{flex:1;display:flex;overflow:hidden}
+
+/* SIDEBAR */
+.sb{width:200px;border-right:1px solid var(--bd);background:var(--sf);flex-shrink:0;display:flex;flex-direction:column}
+.sb-body{flex:1;overflow-y:auto;padding:8px 0}
+.sb-lbl{font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.08em;padding:10px 14px 4px}
+.si{display:flex;align-items:center;gap:7px;padding:7px 14px;cursor:pointer;color:var(--t2);font-size:12px;transition:all .15s;border-left:2px solid transparent;user-select:none}
+.si:hover{background:var(--sf2);color:var(--t)}
+.si.on{background:var(--sf2);color:var(--dw-s);border-left-color:var(--dw-s)}
+.si-n{margin-left:auto;font-size:9px;font-family:var(--mono);padding:1px 5px;border-radius:6px;background:var(--sf3)}
+.si-n.h{background:rgba(192,57,43,.15);color:var(--rd)}
+.sb-div{height:1px;background:var(--bd);margin:5px 14px}
+
+/* CONTENT */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.stabs{display:flex;border-bottom:1px solid var(--bd);padding:0 20px;flex-shrink:0;overflow-x:auto}
+.stab{padding:8px 13px;font-size:12px;cursor:pointer;color:var(--t3);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.stab:hover{color:var(--t2)}.stab.on{color:var(--dw-s);border-bottom-color:var(--dw-s)}
+.body{flex:1;overflow-y:auto;padding:20px}
+.body::-webkit-scrollbar{width:4px}
+.body::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+.pane{display:none}.pane.on{display:block}
+.mod{display:none;flex:1;overflow:hidden;flex-direction:column}
+.mod.on{display:flex}
+
+/* CARDS */
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.ch{padding:10px 16px;border-bottom:1px solid var(--bd);font-size:10px;color:var(--t3);font-family:var(--mono);letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+.sc2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.sc3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.sv{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px}
+.sl{font-size:10px;color:var(--t2);font-family:var(--mono);letter-spacing:.04em;margin-bottom:5px}
+.sn{font-size:20px;font-weight:600;font-family:var(--mono);line-height:1}
+.ss{font-size:11px;color:var(--t3);margin-top:4px}
+
+/* STATUS */
+.status{font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono);display:inline-flex;align-items:center;gap:4px}
+.s-ok{background:var(--gn-d);color:var(--gn)}
+.s-warn{background:var(--yw-d);color:var(--yw)}
+.s-err{background:var(--rd-d);color:var(--rd)}
+.s-off{background:var(--sf3);color:var(--t3)}
+.s-dw{background:var(--dw);color:var(--dw-s)}
+.s-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.vd{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--mono);font-weight:600;display:inline-block}
+.tg{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--mono);display:inline-block;margin:2px}
+
+/* BUTTONS */
+.btn-p{padding:6px 13px;border-radius:5px;background:var(--ac);color:#fff;border:none;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--thai)}
+.btn-s{padding:6px 13px;border-radius:5px;background:var(--sf2);color:var(--t);border:1px solid var(--bd2);font-size:12px;cursor:pointer;font-family:var(--thai)}
+.btn-dw{padding:6px 13px;border-radius:5px;background:var(--dw);color:var(--dw-s);border:1px solid var(--dw-s);font-size:12px;cursor:pointer;font-family:var(--thai)}
+.btn-danger{padding:6px 13px;border-radius:5px;background:var(--rd-d);color:var(--rd);border:1px solid var(--rd-d);font-size:12px;cursor:pointer;font-family:var(--thai)}
+
+/* RESULT ROWS */
+.rrow{display:flex;align-items:flex-start;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bd);transition:background .12s;cursor:pointer}
+.rrow:last-child{border-bottom:none}
+.rrow:hover{background:var(--sf2)}
+.rrow.flagged{border-left:2px solid var(--yw)}
+.rrow.blocked{border-left:2px solid var(--rd);opacity:.6}
+.rrow-body{flex:1;min-width:0}
+.rrow-title{font-size:12px;font-weight:500;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.rrow-url{font-size:10px;color:var(--t3);font-family:var(--mono);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rrow-summary{font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:5px}
+.rrow-tags{display:flex;gap:4px;flex-wrap:wrap}
+
+/* SEED MANAGER */
+.seed-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--bd);font-size:12px}
+.seed-row:last-child{border-bottom:none}
+.seed-url{font-family:var(--mono);font-size:11px;flex:1;color:var(--dw-s)}
+.seed-type{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--mono)}
+
+/* FILTER LOG */
+.flog-row{display:flex;gap:10px;padding:7px 16px;border-bottom:1px solid var(--bd);font-size:11px;align-items:flex-start}
+.flog-row:last-child{border-bottom:none}
+.flog-time{font-family:var(--mono);color:var(--t3);flex-shrink:0;width:130px}
+.flog-result{flex-shrink:0;width:60px}
+.flog-reason{color:var(--t2);flex:1}
+
+/* WATCHLIST */
+.wl-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--bd);font-size:12px}
+.wl-row:last-child{border-bottom:none}
+.wl-kw{font-family:var(--mono);font-size:11px;flex:1;color:var(--t)}
+.wl-hits{font-family:var(--mono);font-size:11px;color:var(--dw-s)}
+
+/* LEGAL REVIEW QUEUE */
+.lq-item{padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;gap:12px;align-items:flex-start}
+.lq-item:last-child{border-bottom:none}
+.lq-body{flex:1}
+.lq-title{font-size:13px;font-weight:500;margin-bottom:4px}
+.lq-meta{font-size:10px;color:var(--t3);font-family:var(--mono);margin-bottom:6px}
+.lq-preview{font-size:12px;color:var(--t2);line-height:1.6;background:var(--sf2);padding:8px 10px;border-radius:5px;margin-bottom:8px}
+.lq-actions{display:flex;gap:6px}
+
+/* CHAIN OF CUSTODY */
+.coc-row{display:flex;gap:10px;padding:8px 16px;border-bottom:1px solid var(--bd);font-size:11px;align-items:center}
+.coc-row:last-child{border-bottom:none}
+.coc-time{font-family:var(--mono);color:var(--t3);flex-shrink:0;width:130px}
+.coc-user{font-family:var(--mono);color:var(--ac);flex-shrink:0;width:80px}
+.coc-action{color:var(--t2);flex:1}
+.coc-snap{font-size:10px;padding:1px 6px;border-radius:3px;background:var(--dw);color:var(--dw-s);font-family:var(--mono);cursor:pointer;flex-shrink:0}
+
+/* TOGGLE */
+.tog{width:34px;height:18px;border-radius:9px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.tok{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;pointer-events:none}
+.tog.on{background:var(--dw-s)}.tog.on .tok{transform:translateX(16px)}
+.tog.off{background:var(--sf3)}
+
+/* PROGRESS */
+.prog-wrap{margin-top:10px;display:none}
+.prog-bar{height:3px;background:var(--sf3);border-radius:2px;overflow:hidden;margin-bottom:8px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--dw),var(--dw-s));border-radius:2px;transition:width .4s}
+.prog-steps{display:flex;flex-direction:column;gap:3px}
+.ps{font-size:10px;font-family:var(--mono);color:var(--t3);display:flex;align-items:center;gap:5px}
+.ps.done{color:var(--gn)}.ps.active{color:var(--dw-s)}
+.ps-dot{width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="tb">
+  <div class="logo"><div class="ld"></div>OSINT//DESK<span class="tb-badge">Dark Web</span></div>
+  <div class="legal-notice">⚠ ใช้งานได้เฉพาะ editorial purpose ที่ได้รับอนุมัติ</div>
+  <div class="tb-right">
+    <div class="tor-status">
+      <div class="tor-dot" style="background:var(--gn)"></div>
+      <span style="color:var(--gn)">Tor connected</span>
+      <span style="color:var(--t3)">·</span>
+      <span style="color:var(--t3)">Circuit: DE-NL-SE</span>
+    </div>
+    <button class="btn-dw" onclick="rotateCircuit()">🔄 New Circuit</button>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- SIDEBAR -->
+<div class="sb">
+  <div class="sb-body">
+    <div class="sb-lbl">INTELLIGENCE</div>
+    <div class="si on" onclick="gm('results',this)">🌑 Results<span class="si-n">14</span></div>
+    <div class="si" onclick="gm('legal',this)">⚖ Legal Review<span class="si-n h">3</span></div>
+    <div class="si" onclick="gm('coc',this)">📋 Chain of Custody</div>
+    <div class="sb-div"></div>
+    <div class="sb-lbl">CONFIGURATION</div>
+    <div class="si" onclick="gm('seeds',this)">🌐 Seed Manager</div>
+    <div class="si" onclick="gm('watch',this)">⭐ Keyword Watch</div>
+    <div class="si" onclick="gm('filter',this)">🛡 Filter Log</div>
+    <div class="sb-div"></div>
+    <div class="sb-lbl">SYSTEM</div>
+    <div class="si" onclick="gm('tor',this)">🔌 Tor Status</div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- ══ RESULTS ══ -->
+  <div class="mod on" id="m-results">
+    <div class="stabs">
+      <div class="stab on" onclick="st('all',this)">ทั้งหมด <span style="color:var(--t3)">14</span></div>
+      <div class="stab" onclick="st('entity',this)">Entity Match</div>
+      <div class="stab" onclick="st('leak',this)">Data Leak</div>
+      <div class="stab" onclick="st('flagged',this)">Flagged <span style="color:var(--yw)">3</span></div>
+    </div>
+    <div class="body">
+      <div class="sc3" style="margin-bottom:14px">
+        <div class="sv"><div class="sl">CRAWLED TODAY</div><div class="sn" style="color:var(--dw-s)">14</div><div class="ss">ผ่าน filter</div></div>
+        <div class="sv"><div class="sl">BLOCKED</div><div class="sn" style="color:var(--rd)">7</div><div class="ss">content filter reject</div></div>
+        <div class="sv"><div class="sl">LEGAL REVIEW</div><div class="sn" style="color:var(--yw)">3</div><div class="ss">รอ Intelligence Lead</div></div>
+      </div>
+
+      <!-- NEW QUERY BOX -->
+      <div style="background:var(--sf);border:1px solid var(--dw);border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--dw-s);margin-bottom:10px;letter-spacing:.06em">🌑 TARGETED QUERY — ระบุเป้าหมายที่ต้องการ ไม่ใช่ crawl แบบ blind</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input id="dw-query" style="flex:1;background:var(--sf2);border:1px solid var(--bd2);border-radius:5px;padding:8px 10px;color:var(--t);font-size:12px;font-family:var(--mono)" placeholder='เช่น "ABC Construction" OR "สมชาย ใจดี" site:.onion' value='"ABC Construction" leaked data'/>
+          <select style="background:var(--sf2);border:1px solid var(--bd2);border-radius:5px;padding:8px 10px;color:var(--t);font-size:12px;font-family:var(--thai)">
+            <option>TorBot + Ahmia</option>
+            <option>Ahmia only</option>
+            <option>Seed list only</option>
+          </select>
+          <button class="btn-dw" onclick="startCrawl()">▶ เริ่ม Crawl</button>
+        </div>
+        <div style="font-size:11px;color:var(--t3)">⚠ ต้องระบุเหตุผล editorial purpose ก่อน: <input id="reason" style="background:var(--sf2);border:1px solid var(--bd2);border-radius:4px;padding:4px 8px;color:var(--t2);font-size:11px;width:300px" placeholder="เช่น: ตรวจสอบการรั่วไหลข้อมูลที่เกี่ยวกับคดี ABC Construction"/></div>
+        <div class="prog-wrap" id="prog-wrap">
+          <div style="margin-top:8px;margin-bottom:6px"><div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div></div>
+          <div class="prog-steps">
+            <div class="ps active" id="ps1"><div class="ps-dot"></div>กำลังเชื่อมต่อผ่าน Tor circuit...</div>
+            <div class="ps" id="ps2"><div class="ps-dot"></div>Query Ahmia index</div>
+            <div class="ps" id="ps3"><div class="ps-dot"></div>Crawl .onion pages ที่พบ</div>
+            <div class="ps" id="ps4"><div class="ps-dot"></div>Content filter + classify</div>
+            <div class="ps" id="ps5"><div class="ps-dot"></div>Entity extraction + store</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS LIST -->
+      <div class="card" id="result-list">
+        <div class="ch"><span>ผลลัพธ์ล่าสุด</span><span style="color:var(--t3)">14 items · filtered</span></div>
+
+        <div class="rrow flagged">
+          <div class="rrow-body">
+            <div class="rrow-title">
+              <span class="vd" style="background:var(--yw-d);color:var(--yw)">FLAGGED</span>
+              พบการอ้างถึง "ABC Construction" ใน data breach forum
+            </div>
+            <div class="rrow-url">abc3z...onion/forum/thread/4821 · crawled 08:14</div>
+            <div class="rrow-summary">กระทู้กล่าวถึงเอกสารสัญญาจัดซื้อที่อ้างว่าได้มาจากหน่วยงานรัฐ — ยังไม่ verify ว่าของจริง ต้องผ่าน legal review ก่อนใช้</div>
+            <div class="rrow-tags">
+              <span class="tg" style="background:var(--yw-d);color:var(--yw)">entity match: ABC Construction</span>
+              <span class="tg" style="background:var(--dw);color:var(--dw-s)">source: data breach forum</span>
+              <span class="tg" style="background:var(--sf3);color:var(--t2)">confidence: 0.74</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+            <span class="status s-warn"><div class="s-dot"></div>legal review</span>
+            <button class="btn-s" style="font-size:11px;padding:5px 10px">ดูรายละเอียด</button>
+          </div>
+        </div>
+
+        <div class="rrow">
+          <div class="rrow-body">
+            <div class="rrow-title">
+              <span class="vd" style="background:var(--dw);color:var(--dw-s)">PASS</span>
+              กล่าวถึงการประมูลโครงการรัฐในฟอรัมทั่วไป
+            </div>
+            <div class="rrow-url">xmh5...onion/board/thai-news/981 · crawled 07:52</div>
+            <div class="rrow-summary">การสนทนาในฟอรัมทั่วไปเกี่ยวกับข่าวประมูลทางหลวง ไม่มีข้อมูลใหม่ที่ clearnet ไม่มี</div>
+            <div class="rrow-tags">
+              <span class="tg" style="background:var(--gn-d);color:var(--gn)">filter: passed</span>
+              <span class="tg" style="background:var(--sf3);color:var(--t2)">confidence: 0.92</span>
+              <span class="tg" style="background:var(--sf3);color:var(--t2)">value: low</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+            <span class="status s-ok"><div class="s-dot"></div>passed</span>
+            <button class="btn-s" style="font-size:11px;padding:5px 10px">ดูรายละเอียด</button>
+          </div>
+        </div>
+
+        <div class="rrow flagged">
+          <div class="rrow-body">
+            <div class="rrow-title">
+              <span class="vd" style="background:var(--yw-d);color:var(--yw)">FLAGGED</span>
+              พบชื่อบริษัทในรายการ "compromised companies"
+            </div>
+            <div class="rrow-url">k3f7...onion/lists/thai-corp-2024 · crawled 07:31</div>
+            <div class="rrow-summary">รายชื่อบริษัทที่อ้างว่าถูก breach — พบชื่อ ABC Construction และ THP Road อยู่ในรายการเดียวกัน</div>
+            <div class="rrow-tags">
+              <span class="tg" style="background:var(--yw-d);color:var(--yw)">entity match: ABC Construction + THP Road</span>
+              <span class="tg" style="background:var(--dw);color:var(--dw-s)">potentially significant</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+            <span class="status s-warn"><div class="s-dot"></div>legal review</span>
+            <button class="btn-s" style="font-size:11px;padding:5px 10px">ดูรายละเอียด</button>
+          </div>
+        </div>
+
+        <div class="rrow blocked" style="cursor:default">
+          <div class="rrow-body">
+            <div class="rrow-title">
+              <span class="vd vd-r" style="background:var(--rd-d);color:var(--rd)">BLOCKED</span>
+              [เนื้อหาถูก block — ไม่แสดง]
+            </div>
+            <div class="rrow-url">blocked · domain blocklist match · 07:28</div>
+            <div class="rrow-summary" style="color:var(--t3)">Content filter ปฏิเสธก่อน store — ดู filter log สำหรับรายละเอียด</div>
+          </div>
+          <div><span class="status s-err"><div class="s-dot"></div>blocked</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ LEGAL REVIEW ══ -->
+  <div class="mod" id="m-legal">
+    <div class="body">
+      <div style="background:linear-gradient(135deg,rgba(183,134,13,.1),transparent);border:1px solid var(--yw-d);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--yw);line-height:1.7">
+        ⚖ <strong>Legal Review Queue</strong> — รายการเหล่านี้ classifier ประเมินว่าอาจมีประโยชน์ต่อการสืบสวน แต่ต้องให้ Intelligence Lead ตรวจสอบก่อนที่ข้อมูลจะเข้า pipeline หลัก เนื้อหาจริงยังไม่ถูก store
+      </div>
+
+      <div class="card">
+        <div class="ch"><span>รอ review</span><span style="color:var(--yw)">3 รายการ</span></div>
+
+        <div class="lq-item">
+          <div class="lq-body">
+            <div class="lq-title">พบการอ้างถึง "ABC Construction" ใน data breach forum</div>
+            <div class="lq-meta">abc3z...onion · crawled 08:14 · by สุเมธ · reason: ตรวจสอบการรั่วไหลข้อมูลคดี ABC</div>
+            <div class="lq-preview">กระทู้กล่าวถึงเอกสารสัญญาจัดซื้อที่อ้างว่าได้มาจากหน่วยงานรัฐ — ไม่ทราบว่า authentic หรือไม่ classifier confidence 0.74</div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+              <span class="tg" style="background:var(--yw-d);color:var(--yw)">entity match: ABC Construction</span>
+              <span class="tg" style="background:var(--sf3);color:var(--t2)">potential value: HIGH</span>
+              <span class="tg" style="background:var(--sf3);color:var(--t2)">legal risk: MEDIUM</span>
+            </div>
+            <div class="lq-actions">
+              <button class="btn-p" style="font-size:12px" onclick="approveItem(this)">✓ อนุมัติ — เข้า pipeline</button>
+              <button class="btn-danger" style="font-size:12px" onclick="rejectItem(this)">✗ ปฏิเสธ — ไม่เก็บ</button>
+              <button class="btn-s" style="font-size:12px">🔗 ดู snapshot</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="lq-item">
+          <div class="lq-body">
+            <div class="lq-title">พบชื่อบริษัทในรายการ compromised companies</div>
+            <div class="lq-meta">k3f7...onion · crawled 07:31 · by สุเมธ · reason: ตรวจสอบ entity overlap</div>
+            <div class="lq-preview">รายชื่อบริษัทที่อ้างว่าถูก breach พบ ABC Construction และ THP Road ในรายการเดียวกัน — อาจเชื่อมกับ missing link ที่กำลังหาอยู่</div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+              <span class="tg" style="background:var(--yw-d);color:var(--yw)">entity match: ABC + THP Road</span>
+              <span class="tg" style="background:var(--sf3);color:var(--t2)">potential value: VERY HIGH</span>
+            </div>
+            <div class="lq-actions">
+              <button class="btn-p" style="font-size:12px" onclick="approveItem(this)">✓ อนุมัติ — เข้า pipeline</button>
+              <button class="btn-danger" style="font-size:12px" onclick="rejectItem(this)">✗ ปฏิเสธ</button>
+              <button class="btn-s" style="font-size:12px">🔗 ดู snapshot</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CHAIN OF CUSTODY ══ -->
+  <div class="mod" id="m-coc">
+    <div class="body">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.7;padding:10px 14px;background:var(--sf);border-radius:8px;border:1px solid var(--bd)">
+        📋 Chain of Custody — บันทึกทุกการเข้าถึง ไม่สามารถแก้ไขหรือลบได้ ใช้อ้างอิงทางกฎหมายและ editorial accountability
+      </div>
+      <div class="card">
+        <div class="ch"><span>AUDIT LOG (append-only)</span><button class="btn-s" style="font-size:11px;padding:4px 10px">⬇ Export</button></div>
+        <div class="coc-row"><div class="coc-time">08:14:07</div><div class="coc-user">สุเมธ</div><div class="coc-action">Query: "ABC Construction" → 4 results crawled, 1 blocked, 2 legal review</div><span class="coc-snap">📸 snap</span></div>
+        <div class="coc-row"><div class="coc-time">08:10:33</div><div class="coc-user">system</div><div class="coc-action">Tor circuit rotated: US-FR-NL → DE-NL-SE</div><span class="coc-snap">—</span></div>
+        <div class="coc-row"><div class="coc-time">07:52:18</div><div class="coc-user">สุเมธ</div><div class="coc-action">Legal Review APPROVED: item #dw-0021 — เข้า Investigation pipeline</div><span class="coc-snap">📸 snap</span></div>
+        <div class="coc-row"><div class="coc-time">07:31:44</div><div class="coc-user">สุเมธ</div><div class="coc-action">Query: "THP Road" ".onion" → 2 results, 1 flagged</div><span class="coc-snap">📸 snap</span></div>
+        <div class="coc-row"><div class="coc-time">07:28:02</div><div class="coc-user">system</div><div class="coc-action">Content filter BLOCKED: domain match blocklist category:prohibited</div><span class="coc-snap">—</span></div>
+        <div class="coc-row"><div class="coc-time">08:00:00</div><div class="coc-user">system</div><div class="coc-action">Dark web module started — Tor connected, circuit: US-FR-NL</div><span class="coc-snap">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SEEDS ══ -->
+  <div class="mod" id="m-seeds">
+    <div class="body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:600">Seed URL Manager</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-s" style="font-size:12px">+ เพิ่ม Seed</button>
+          <button class="btn-dw" style="font-size:12px">Refresh จาก Ahmia</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><span>Active Seeds (6)</span></div>
+        <div class="seed-row"><div class="seed-url">ahmia.fi (clearnet index)</div><span class="seed-type" style="background:var(--dw);color:var(--dw-s)">INDEX</span><span class="status s-ok"><div class="s-dot"></div>reachable</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+        <div class="seed-row"><div class="seed-url">zqktlwiuavvvqqt4ybvgvi7tyo4hjl5xgfuvpdf6otjiycgwqbym2qad.onion</div><span class="seed-type" style="background:var(--sf3);color:var(--t2)">WIKI</span><span class="status s-ok"><div class="s-dot"></div>online</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+        <div class="seed-row"><div class="seed-url">dwnewsgngmhlplxy6o2twtfgjnrnjursa56uirefni5...onion</div><span class="seed-type" style="background:var(--sf3);color:var(--t2)">NEWS</span><span class="status s-warn"><div class="s-dot"></div>slow</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+        <div class="seed-row"><div class="seed-url">[custom seed — Thai forum monitor]</div><span class="seed-type" style="background:var(--ac-d);color:var(--ac)">CUSTOM</span><span class="status s-ok"><div class="s-dot"></div>online</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ KEYWORD WATCH ══ -->
+  <div class="mod" id="m-watch">
+    <div class="body">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.7;padding:10px 14px;background:var(--sf);border-radius:8px;border:1px solid var(--bd)">
+        ⭐ VigilantOnion monitor .onion sites ต่อเนื่อง แจ้งเตือนเมื่อพบ keyword เหล่านี้
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input style="flex:1;background:var(--sf2);border:1px solid var(--bd2);border-radius:5px;padding:7px 10px;color:var(--t);font-size:12px;font-family:var(--mono)" placeholder="เพิ่ม keyword ใหม่..."/>
+        <button class="btn-dw">+ เพิ่ม</button>
+      </div>
+      <div class="card">
+        <div class="ch"><span>Keywords (8)</span><span style="color:var(--dw-s)">VigilantOnion monitoring</span></div>
+        <div class="wl-row"><div class="wl-kw">"ABC Construction"</div><div class="wl-hits" style="color:var(--yw)">3 hits</div><span class="status s-ok"><div class="s-dot"></div>monitoring</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+        <div class="wl-row"><div class="wl-kw">"THP Road" OR "THP Road Co"</div><div class="wl-hits" style="color:var(--yw)">1 hit</div><span class="status s-ok"><div class="s-dot"></div>monitoring</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+        <div class="wl-row"><div class="wl-kw">"นายสมชาย ใจดี"</div><div class="wl-hits">0 hits</div><span class="status s-ok"><div class="s-dot"></div>monitoring</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+        <div class="wl-row"><div class="wl-kw">amarintv leaked</div><div class="wl-hits">0 hits</div><span class="status s-ok"><div class="s-dot"></div>monitoring</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+        <div class="wl-row"><div class="wl-kw">gprocurement.go.th data</div><div class="wl-hits" style="color:var(--rd)">1 hit (flagged)</div><span class="status s-warn"><div class="s-dot"></div>alert</span><div class="tog on" style="margin-left:auto"><div class="tok"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ FILTER LOG ══ -->
+  <div class="mod" id="m-filter">
+    <div class="body">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.7;padding:10px 14px;background:var(--sf);border-radius:8px;border:1px solid var(--bd)">
+        🛡 Content Filter Log — แสดงเฉพาะ metadata ของ items ที่ถูก block (ไม่เก็บเนื้อหาจริง)
+      </div>
+      <div class="card">
+        <div class="ch"><span>Filter Events Today</span><span style="color:var(--rd)">7 blocked</span></div>
+        <div class="flog-row"><div class="flog-time">08:14:09</div><div class="flog-result"><span class="status s-ok"><div class="s-dot"></div>PASS</span></div><div class="flog-reason">Thai forum discussion — confidence 0.92 — เข้า pipeline</div></div>
+        <div class="flog-row"><div class="flog-time">07:28:02</div><div class="flog-result"><span class="status s-err"><div class="s-dot"></div>BLOCK</span></div><div class="flog-reason">Domain blocklist match: category=prohibited — เนื้อหาไม่ถูก store</div></div>
+        <div class="flog-row"><div class="flog-time">07:22:15</div><div class="flog-result"><span class="status s-warn"><div class="s-dot"></div>REVIEW</span></div><div class="flog-reason">Confidence 0.74 — ส่ง legal review queue</div></div>
+        <div class="flog-row"><div class="flog-time">07:18:44</div><div class="flog-result"><span class="status s-err"><div class="s-dot"></div>BLOCK</span></div><div class="flog-reason">Domain blocklist match: category=prohibited — เนื้อหาไม่ถูก store</div></div>
+        <div class="flog-row"><div class="flog-time">07:15:30</div><div class="flog-result"><span class="status s-ok"><div class="s-dot"></div>PASS</span></div><div class="flog-reason">Data breach discussion — entity match — confidence 0.88</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TOR STATUS ══ -->
+  <div class="mod" id="m-tor">
+    <div class="body">
+      <div class="sc2" style="margin-bottom:14px">
+        <div class="sv" style="border-color:var(--dw)"><div class="sl">TOR STATUS</div><div class="sn" style="color:var(--gn)">Connected</div><div class="ss">Circuit: DE-NL-SE</div></div>
+        <div class="sv"><div class="sl">ISOLATION</div><div class="sn" style="color:var(--dw-s)">Isolated</div><div class="ss">darkweb-net only</div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><span>Circuit Info</span><button class="btn-dw" style="font-size:11px;padding:4px 10px" onclick="rotateCircuit()">🔄 New Circuit</button></div>
+        <div style="padding:16px;font-family:var(--mono);font-size:12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:12px"><span style="color:var(--t3);width:140px">Entry Node</span><span style="color:var(--gn)">DE · Frankfurt</span></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--t3);width:140px">Middle Node</span><span style="color:var(--gn)">NL · Amsterdam</span></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--t3);width:140px">Exit Node</span><span style="color:var(--gn)">SE · Stockholm</span></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--t3);width:140px">SOCKS5 Proxy</span><span style="color:var(--dw-s)">127.0.0.1:9050</span></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--t3);width:140px">Latency</span><span style="color:var(--yw)">~2.4s avg</span></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--t3);width:140px">Real IP exposed</span><span style="color:var(--gn)">No (isolated container)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end content -->
+</div><!-- end main -->
+
+<script>
+function gm(id, el) {
+  document.querySelectorAll('.mod').forEach(m => m.classList.remove('on'));
+  document.getElementById('m-' + id).classList.add('on');
+  document.querySelectorAll('.si').forEach(i => i.classList.remove('on'));
+  if (el) el.classList.add('on');
+}
+function st(tab, btn) {
+  document.querySelectorAll('.stab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+function startCrawl() {
+  const reason = document.getElementById('reason').value.trim();
+  if (!reason) { alert('กรุณาระบุ editorial purpose ก่อนเริ่ม crawl'); return; }
+  const pw = document.getElementById('prog-wrap');
+  pw.style.display = 'block';
+  const steps = ['ps1','ps2','ps3','ps4','ps5'];
+  const pcts = [15,35,60,80,100];
+  let i = 0;
+  function next() {
+    if (i > 0) document.getElementById(steps[i-1]).className = 'ps done';
+    if (i < steps.length) {
+      document.getElementById(steps[i]).className = 'ps active';
+      document.getElementById('prog-fill').style.width = pcts[i] + '%';
+      i++;
+      setTimeout(next, i === 4 ? 1500 : 700);
+    } else {
+      setTimeout(() => { pw.style.display = 'none'; document.getElementById('prog-fill').style.width = '0%'; steps.forEach(s => document.getElementById(s).className = 'ps'); i = 0; }, 1000);
+    }
+  }
+  next();
+}
+function rotateCircuit() {
+  const circuits = ['US-FR-NL','DE-NL-SE','CH-AT-CZ','FI-EE-LV'];
+  const c = circuits[Math.floor(Math.random() * circuits.length)];
+  document.querySelector('.tor-status').innerHTML = `<div class="tor-dot" style="background:var(--yw)"></div><span style="color:var(--yw)">Rotating...</span>`;
+  setTimeout(() => {
+    document.querySelector('.tor-status').innerHTML = `<div class="tor-dot" style="background:var(--gn);animation:blink 2s infinite"></div><span style="color:var(--gn)">Tor connected</span><span style="color:var(--t3)">·</span><span style="color:var(--t3)">Circuit: ${c}</span>`;
+  }, 1500);
+}
+function approveItem(btn) {
+  const item = btn.closest('.lq-item');
+  item.style.opacity = '0.5';
+  btn.textContent = '✓ อนุมัติแล้ว — เข้า pipeline';
+  btn.disabled = true;
+  item.querySelectorAll('button').forEach(b => b.disabled = true);
+}
+function rejectItem(btn) {
+  const item = btn.closest('.lq-item');
+  item.style.opacity = '0.4';
+  btn.textContent = '✗ ปฏิเสธแล้ว';
+  btn.disabled = true;
+  item.querySelectorAll('button').forEach(b => b.disabled = true);
+}
+document.querySelectorAll('.tog').forEach(t => {
+  t.onclick = () => { t.classList.toggle('on'); t.classList.toggle('off'); };
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OSINT//DESK — Adapter Framework</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0D0F14;--sf:#13161D;--sf2:#191D26;--sf3:#1F2330;
+  --bd:#232838;--bd2:#2C3347;
+  --t:#C9D1E0;--t2:#7A869A;--t3:#445068;
+  --ac:#4B7BEC;--ac-d:#1A2B4A;
+  --gn:#1E8449;--gn-d:#0D2318;
+  --yw:#B7860D;--yw-d:#2A1F08;
+  --rd:#C0392B;--rd-d:#2A1010;
+  --pu:#6C3483;--pu-d:#1F1030;
+  --tl:#16A085;--tl-d:#0A2620;
+  --or:#CA6F1E;--or-d:#2A1808;
+  --mono:'IBM Plex Mono',monospace;
+  --thai:'Noto Sans Thai',sans-serif;
+}
+body{background:var(--bg);color:var(--t);font-family:var(--thai);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.tb{height:44px;border-bottom:1px solid var(--bd);background:var(--sf);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+.logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--ac)}
+.tb-title{font-size:13px;font-weight:600}
+.tabs{display:flex;gap:6px;margin-left:auto}
+.tab-btn{padding:5px 14px;border-radius:5px;border:1px solid var(--bd2);background:var(--sf2);color:var(--t2);font-size:12px;cursor:pointer;font-family:var(--thai);transition:all .15s}
+.tab-btn:hover{color:var(--t);border-color:var(--bd)}
+.tab-btn.on{background:var(--ac-d);color:var(--ac);border-color:var(--ac)}
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.pane{display:none;flex:1;overflow-y:auto;padding:24px}
+.pane.on{display:block}
+.pane::-webkit-scrollbar{width:5px}
+.pane::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
+
+/* DIAGRAM */
+.flow{max-width:1100px;margin:0 auto}
+.flow-title{font-size:16px;font-weight:600;margin-bottom:6px;text-align:center}
+.flow-sub{font-size:12px;color:var(--t2);text-align:center;margin-bottom:28px}
+.sources-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px}
+.src-node{background:var(--sf);border:1px solid var(--bd2);border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.src-node:hover{transform:translateY(-2px)}
+.src-ico{font-size:22px;margin-bottom:5px}
+.src-name{font-size:11px;font-weight:600;line-height:1.3}
+.src-ex{font-size:9px;color:var(--t3);font-family:var(--mono);margin-top:3px}
+.converge{display:flex;justify-content:center;margin:4px 0}
+.converge svg{width:100%;max-width:900px;height:50px}
+.adapter-band{background:linear-gradient(180deg,var(--ac-d),transparent);border:1px solid var(--ac);border-radius:12px;padding:16px;text-align:center;margin-bottom:8px}
+.adapter-band .ab-title{font-size:14px;font-weight:600;color:var(--ac);margin-bottom:4px;font-family:var(--mono)}
+.adapter-band .ab-sub{font-size:11px;color:var(--t2)}
+.adapter-steps{display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.astep{background:var(--sf);border:1px solid var(--bd2);border-radius:6px;padding:6px 12px;font-size:11px;font-family:var(--mono);color:var(--t2)}
+.astep b{color:var(--ac)}
+.arrow-c{text-align:center;color:var(--t3);font-size:18px;margin:2px 0}
+.canon-box{background:var(--sf2);border:1px dashed var(--bd2);border-radius:10px;padding:14px 18px;text-align:center;margin-bottom:8px;max-width:500px;margin-left:auto;margin-right:auto}
+.canon-title{font-size:12px;font-weight:600;font-family:var(--mono);color:var(--tl);margin-bottom:8px}
+.canon-fields{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.cf{font-size:10px;padding:2px 7px;border-radius:3px;background:var(--tl-d);color:var(--tl);font-family:var(--mono)}
+.pipeline-box{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px;text-align:center;max-width:600px;margin:0 auto}
+.pipe-flow{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;font-size:11px;font-family:var(--mono);color:var(--t2)}
+.pipe-flow b{color:var(--t)}
+.pipe-arrow{color:var(--t3)}
+
+/* detail popup */
+.src-detail{display:none;margin-top:16px;background:var(--sf);border:1px solid var(--bd2);border-radius:10px;padding:16px}
+.src-detail.show{display:block}
+.sd-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sd-title{font-size:14px;font-weight:600}
+.sd-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.sd-col h4{font-size:10px;font-family:var(--mono);color:var(--t3);letter-spacing:.06em;margin-bottom:6px}
+.sd-col p{font-size:12px;color:var(--t2);line-height:1.6}
+.sd-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.sd-tag{font-size:10px;padding:2px 7px;border-radius:3px;background:var(--sf3);color:var(--t2);font-family:var(--mono)}
+
+/* CONFIG UI */
+.cfg-wrap{max-width:900px;margin:0 auto}
+.cfg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.cfg-title{font-size:15px;font-weight:600}
+.btn-add{background:var(--ac);color:#fff;border:none;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--thai)}
+.src-list{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+.src-row{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.src-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.src-status.ok{background:var(--gn);box-shadow:0 0 6px var(--gn)}
+.src-status.warn{background:var(--yw)}
+.src-status.err{background:var(--rd)}
+.src-info{flex:1;min-width:0}
+.src-info .name{font-size:13px;font-weight:500}
+.src-info .meta{font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:2px}
+.src-type-badge{font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+.src-stats{font-size:10px;color:var(--t3);font-family:var(--mono);text-align:right}
+.src-toggle{width:34px;height:19px;border-radius:10px;background:var(--gn);position:relative;cursor:pointer;flex-shrink:0}
+.src-toggle.off{background:var(--sf3)}
+.src-toggle::after{content:'';position:absolute;top:2px;right:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:all .2s}
+.src-toggle.off::after{left:2px;right:auto}
+
+/* add form */
+.add-form{background:var(--sf);border:1px solid var(--ac-d);border-radius:12px;padding:20px;margin-bottom:24px}
+.af-title{font-size:13px;font-weight:600;margin-bottom:16px;color:var(--ac)}
+.af-type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.af-type{background:var(--sf2);border:1px solid var(--bd2);border-radius:8px;padding:12px;text-align:center;cursor:pointer;transition:all .15s}
+.af-type:hover{border-color:var(--bd)}
+.af-type.sel{border-color:var(--ac);background:var(--ac-d)}
+.af-type .ico{font-size:20px;margin-bottom:4px}
+.af-type .lbl{font-size:11px;font-weight:500}
+.af-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.af-field label{font-size:11px;color:var(--t2);display:block;margin-bottom:4px}
+.af-field input,.af-field select{width:100%;background:var(--sf2);border:1px solid var(--bd2);border-radius:6px;padding:8px 10px;color:var(--t);font-size:12px;font-family:var(--thai)}
+.af-field input:focus,.af-field select:focus{outline:none;border-color:var(--ac)}
+.af-actions{display:flex;gap:8px}
+.btn-test{background:var(--sf2);border:1px solid var(--bd2);color:var(--t);padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;font-family:var(--thai)}
+.btn-save{background:var(--ac);color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--thai)}
+.test-result{margin-top:12px;padding:10px 12px;border-radius:6px;font-size:11px;font-family:var(--mono);display:none}
+.test-result.show{display:block;background:var(--gn-d);color:var(--gn);border:1px solid var(--gn)}
+.sec-label{font-size:10px;font-family:var(--mono);color:var(--t3);letter-spacing:.06em;margin:20px 0 10px}
+</style>
+</head>
+<body>
+
+<div class="tb">
+  <div class="logo"><div class="logo-dot"></div>OSINT//DESK</div>
+  <span class="tb-title">Adapter Framework</span>
+  <div class="tabs">
+    <button class="tab-btn on" onclick="sw('diagram',this)">📊 Flow Diagram</button>
+    <button class="tab-btn" onclick="sw('config',this)">⚙ Source Config</button>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══ DIAGRAM ══ -->
+<div class="pane on" id="p-diagram">
+  <div class="flow">
+    <div class="flow-title">Ingestion Adapter Framework</div>
+    <div class="flow-sub">ทุกแหล่งข่าวแปลงเป็นรูปแบบมาตรฐานเดียว ก่อนเข้า pipeline — คลิกแต่ละแหล่งเพื่อดูรายละเอียด</div>
+
+    <!-- SOURCES -->
+    <div class="sources-row">
+      <div class="src-node" onclick="showSrc('rss')" style="border-color:var(--ac-d)">
+        <div class="src-ico">📡</div><div class="src-name">RSS / Atom</div><div class="src-ex">feedparser</div>
+      </div>
+      <div class="src-node" onclick="showSrc('wire')" style="border-color:var(--gn-d)">
+        <div class="src-ico">📰</div><div class="src-name">News Wire</div><div class="src-ex">Reuters · AP · ไทยรัฐ</div>
+      </div>
+      <div class="src-node" onclick="showSrc('social')" style="border-color:var(--pu-d)">
+        <div class="src-ico">💬</div><div class="src-name">Social Media</div><div class="src-ex">FB · X · TikTok</div>
+      </div>
+      <div class="src-node" onclick="showSrc('cms')" style="border-color:var(--or-d)">
+        <div class="src-ico">🗄</div><div class="src-name">CMS ภายใน</div><div class="src-ex">DB · API · export</div>
+      </div>
+      <div class="src-node" onclick="showSrc('msg')" style="border-color:var(--tl-d)">
+        <div class="src-ico">📨</div><div class="src-name">Messaging</div><div class="src-ex">Email · Line · TG</div>
+      </div>
+      <div class="src-node" onclick="showSrc('webhook')" style="border-color:var(--yw-d)">
+        <div class="src-ico">🔌</div><div class="src-name">Webhook</div><div class="src-ex">push · config-driven</div>
+      </div>
+    </div>
+
+    <!-- src detail -->
+    <div class="src-detail" id="src-detail"></div>
+
+    <!-- converge -->
+    <div class="converge">
+      <svg viewBox="0 0 900 50" preserveAspectRatio="none">
+        <path d="M75 0 Q75 25 450 35" fill="none" stroke="#2C3347" stroke-width="1"/>
+        <path d="M225 0 Q225 25 450 35" fill="none" stroke="#2C3347" stroke-width="1"/>
+        <path d="M375 0 Q375 25 450 35" fill="none" stroke="#2C3347" stroke-width="1"/>
+        <path d="M525 0 Q525 25 450 35" fill="none" stroke="#2C3347" stroke-width="1"/>
+        <path d="M675 0 Q675 25 450 35" fill="none" stroke="#2C3347" stroke-width="1"/>
+        <path d="M825 0 Q825 25 450 35" fill="none" stroke="#2C3347" stroke-width="1"/>
+        <circle cx="450" cy="38" r="4" fill="#4B7BEC"/>
+      </svg>
+    </div>
+
+    <!-- ADAPTER BAND -->
+    <div class="adapter-band">
+      <div class="ab-title">ADAPTER LAYER</div>
+      <div class="ab-sub">แต่ละแหล่งมี adapter ของตัวเอง · drop-in plugin · ไม่ต้องแตะ core</div>
+      <div class="adapter-steps">
+        <div class="astep"><b>1</b> connect</div>
+        <div class="astep"><b>2</b> fetch</div>
+        <div class="astep"><b>3</b> transform</div>
+        <div class="astep"><b>4</b> emit</div>
+      </div>
+    </div>
+
+    <div class="arrow-c">↓</div>
+
+    <!-- CANONICAL -->
+    <div class="canon-box">
+      <div class="canon-title">CANONICAL FEED ITEM — รูปแบบมาตรฐานกลาง</div>
+      <div class="canon-fields">
+        <span class="cf">external_id</span><span class="cf">title</span><span class="cf">body</span>
+        <span class="cf">source_type</span><span class="cf">published_at</span><span class="cf">media[]</span>
+        <span class="cf">source_weight</span><span class="cf">verified</span><span class="cf">language</span>
+      </div>
+    </div>
+
+    <div class="arrow-c">↓</div>
+
+    <!-- PIPELINE -->
+    <div class="pipeline-box">
+      <div style="font-size:10px;font-family:var(--mono);color:var(--t3);margin-bottom:8px">UNIFIED PIPELINE — ทุก item เหมือนกันจากจุดนี้</div>
+      <div class="pipe-flow">
+        <b>Redis Queue</b><span class="pipe-arrow">→</span>
+        <b>LLM Triage</b><span class="pipe-arrow">→</span>
+        <b>PostgreSQL</b><span class="pipe-arrow">→</span>
+        <b>Today's Intel</b>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIG ══ -->
+<div class="pane" id="p-config">
+  <div class="cfg-wrap">
+    <div class="cfg-header">
+      <div class="cfg-title">จัดการแหล่งข่าว (Source Configuration)</div>
+      <button class="btn-add" onclick="toggleAdd()">+ เพิ่มแหล่งข่าว</button>
+    </div>
+
+    <!-- ADD FORM -->
+    <div class="add-form" id="add-form" style="display:none">
+      <div class="af-title">เพิ่มแหล่งข่าวใหม่</div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:10px">เลือกประเภท adapter</div>
+      <div class="af-type-grid">
+        <div class="af-type sel" onclick="selType(this,'rss')"><div class="ico">📡</div><div class="lbl">RSS / Atom</div></div>
+        <div class="af-type" onclick="selType(this,'wire')"><div class="ico">📰</div><div class="lbl">News Wire</div></div>
+        <div class="af-type" onclick="selType(this,'social')"><div class="ico">💬</div><div class="lbl">Social Media</div></div>
+        <div class="af-type" onclick="selType(this,'cms')"><div class="ico">🗄</div><div class="lbl">CMS ภายใน</div></div>
+        <div class="af-type" onclick="selType(this,'msg')"><div class="ico">📨</div><div class="lbl">Messaging</div></div>
+        <div class="af-type" onclick="selType(this,'webhook')"><div class="ico">🔌</div><div class="lbl">Webhook</div></div>
+      </div>
+      <div class="af-fields">
+        <div class="af-field"><label>ชื่อแหล่งข่าว</label><input type="text" placeholder="เช่น Thairath RSS" value="Thairath RSS"/></div>
+        <div class="af-field"><label>URL / Endpoint</label><input type="text" placeholder="https://www.thairath.co.th/rss/news"/></div>
+        <div class="af-field"><label>รอบเวลาดึงข้อมูล</label><select><option>ทุก 5 นาที</option><option>ทุก 1 นาที</option><option>ทุก 10 นาที</option><option>ทุก 30 นาที</option><option>Realtime (webhook)</option></select></div>
+        <div class="af-field"><label>น้ำหนัก Triage (0-2)</label><input type="text" value="1.0"/></div>
+        <div class="af-field"><label>แหล่งเชื่อถือได้?</label><select><option>ใช่ — verified source</option><option>ไม่ — ต้อง verify</option></select></div>
+        <div class="af-field"><label>ภาษาหลัก</label><select><option>ไทย</option><option>อังกฤษ</option><option>อัตโนมัติ</option></select></div>
+      </div>
+      <div class="af-actions">
+        <button class="btn-test" onclick="testConn()">🔌 ทดสอบการเชื่อมต่อ</button>
+        <button class="btn-save">💾 บันทึกและเปิดใช้</button>
+      </div>
+      <div class="test-result" id="test-result">✓ เชื่อมต่อสำเร็จ — พบ 24 รายการ ตัวอย่าง: "ครม.อนุมัติงบ..." แปลงเป็น canonical format ผ่าน</div>
+    </div>
+
+    <!-- ACTIVE SOURCES -->
+    <div class="sec-label">แหล่งข่าวที่เปิดใช้งาน (8)</div>
+    <div class="src-list">
+      <div class="src-row">
+        <div class="src-status ok"></div>
+        <div class="src-info"><div class="name">Thairath RSS</div><div class="meta">rss · ดึงล่าสุด 2 นาทีที่แล้ว</div></div>
+        <span class="src-type-badge" style="background:var(--ac-d);color:var(--ac)">RSS</span>
+        <div class="src-stats">247 items วันนี้<br>success 99.2%</div>
+        <div class="src-toggle"></div>
+      </div>
+      <div class="src-row">
+        <div class="src-status ok"></div>
+        <div class="src-info"><div class="name">Reuters Wire (Thailand)</div><div class="meta">wire · ดึงล่าสุด 40 วินาทีที่แล้ว</div></div>
+        <span class="src-type-badge" style="background:var(--gn-d);color:var(--gn)">WIRE</span>
+        <div class="src-stats">89 items วันนี้<br>success 100%</div>
+        <div class="src-toggle"></div>
+      </div>
+      <div class="src-row">
+        <div class="src-status ok"></div>
+        <div class="src-info"><div class="name">e-GP จัดซื้อจัดจ้าง</div><div class="meta">webhook · realtime</div></div>
+        <span class="src-type-badge" style="background:var(--yw-d);color:var(--yw)">WEBHOOK</span>
+        <div class="src-stats">12 items วันนี้<br>success 100%</div>
+        <div class="src-toggle"></div>
+      </div>
+      <div class="src-row">
+        <div class="src-status warn"></div>
+        <div class="src-info"><div class="name">Facebook Page Monitor</div><div class="meta">social · rate limited — รอ 8 นาที</div></div>
+        <span class="src-type-badge" style="background:var(--pu-d);color:var(--pu-s,#9B7FBF)">SOCIAL</span>
+        <div class="src-stats">34 items วันนี้<br>success 87%</div>
+        <div class="src-toggle"></div>
+      </div>
+      <div class="src-row">
+        <div class="src-status ok"></div>
+        <div class="src-info"><div class="name">Line Official (tips)</div><div class="meta">messaging · ดึงล่าสุด 5 นาทีที่แล้ว</div></div>
+        <span class="src-type-badge" style="background:var(--tl-d);color:var(--tl)">MESSAGING</span>
+        <div class="src-stats">8 items วันนี้<br>unverified</div>
+        <div class="src-toggle"></div>
+      </div>
+      <div class="src-row">
+        <div class="src-status ok"></div>
+        <div class="src-info"><div class="name">Internal CMS (Amarin)</div><div class="meta">cms · DB connection</div></div>
+        <span class="src-type-badge" style="background:var(--or-d);color:var(--or,#CA6F1E)">CMS</span>
+        <div class="src-stats">56 items วันนี้<br>success 100%</div>
+        <div class="src-toggle"></div>
+      </div>
+      <div class="src-row">
+        <div class="src-status err"></div>
+        <div class="src-info"><div class="name">GDELT Global Feed</div><div class="meta">rss · ✗ เชื่อมต่อล้มเหลว — retry ใน 3 นาที</div></div>
+        <span class="src-type-badge" style="background:var(--ac-d);color:var(--ac)">RSS</span>
+        <div class="src-stats">0 items<br>last ok 1h ago</div>
+        <div class="src-toggle"></div>
+      </div>
+      <div class="src-row">
+        <div class="src-status ok"></div>
+        <div class="src-info"><div class="name">Telegram Channels</div><div class="meta">messaging · ดึงล่าสุด 1 นาทีที่แล้ว</div></div>
+        <span class="src-type-badge" style="background:var(--tl-d);color:var(--tl)">MESSAGING</span>
+        <div class="src-stats">19 items วันนี้<br>unverified</div>
+        <div class="src-toggle"></div>
+      </div>
+    </div>
+
+    <!-- QUARANTINE -->
+    <div class="sec-label">รายการที่แปลงไม่สำเร็จ (Quarantine) — 3 รายการ</div>
+    <div class="src-list">
+      <div class="src-row" style="border-color:var(--rd-d)">
+        <div class="src-status err"></div>
+        <div class="src-info"><div class="name">Facebook Page Monitor</div><div class="meta">field "message" หายไป — ตรวจสอบ field mapping</div></div>
+        <button class="btn-test" style="padding:5px 12px">ดู raw</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const SRC_DATA={
+  rss:{ico:'📡',name:'RSS / Atom Adapter',color:'var(--ac)',
+    use:'เว็บไซต์ข่าว บล็อก ฟีดมาตรฐานทั่วไป',
+    tech:'feedparser · polling ตามรอบเวลา',
+    note:'พื้นฐานที่สุด รองรับทั้งฟีดสาธารณะและที่ต้อง auth',
+    tags:['feedparser','polling','public/auth']},
+  wire:{ico:'📰',name:'News Wire Adapter',color:'var(--gn)',
+    use:'Reuters, AP, ไทยรัฐ, สำนักข่าวที่มีระบบส่งข่าวเฉพาะ',
+    tech:'API key auth · quota management · push/pull',
+    note:'จัดการรูปแบบเฉพาะแต่ละสำนัก + โควต้าการเรียกใช้',
+    tags:['api-key','quota','high-trust']},
+  social:{ico:'💬',name:'Social Media Adapter',color:'var(--pu-s,#9B7FBF)',
+    use:'Facebook, X, TikTok ผ่าน official API',
+    tech:'OAuth · rate limiting · media extraction',
+    note:'ดึงสื่อแนบส่งให้ UGC Verify · จัดการ rate limit',
+    tags:['oauth','rate-limit','media']},
+  cms:{ico:'🗄',name:'CMS Adapter',color:'var(--or,#CA6F1E)',
+    use:'ระบบจัดการเนื้อหาภายในที่ห้องข่าวพัฒนาเอง',
+    tech:'DB direct · internal API · export file',
+    note:'ปรับแต่งตามลูกค้า · ข่าวที่ทีมผลิตเองเข้า triage ได้',
+    tags:['db-direct','custom','internal']},
+  msg:{ico:'📨',name:'Messaging Adapter',color:'var(--tl)',
+    use:'อีเมล, Line, Telegram — เบาะแสจากแหล่งข่าว/ประชาชน',
+    tech:'IMAP · Line API · Telegram Bot API',
+    note:'แยกเนื้อหาจากข้อความ · จัดการไฟล์แนบ · mark unverified',
+    tags:['imap','bot-api','unverified']},
+  webhook:{ico:'🔌',name:'Webhook Adapter',color:'var(--yw)',
+    use:'ระบบภายนอกที่ push ข้อมูลมา · เครื่องมือเฉพาะของลูกค้า',
+    tech:'HTTP endpoint · config-driven field mapping',
+    note:'ยืดหยุ่นสุด · กำหนด mapping ผ่าน config ไม่ต้องเขียนโค้ด',
+    tags:['push','config-driven','flexible']},
+};
+
+function showSrc(key){
+  const d=SRC_DATA[key];
+  const el=document.getElementById('src-detail');
+  el.innerHTML=`
+    <div class="sd-head">
+      <span style="font-size:24px">${d.ico}</span>
+      <div class="sd-title" style="color:${d.color}">${d.name}</div>
+    </div>
+    <div class="sd-grid">
+      <div class="sd-col"><h4>ใช้กับแหล่งใด</h4><p>${d.use}</p></div>
+      <div class="sd-col"><h4>เทคโนโลยี</h4><p>${d.tech}</p></div>
+    </div>
+    <div class="sd-col" style="margin-top:10px"><h4>หมายเหตุ</h4><p>${d.note}</p>
+    <div class="sd-tags">${d.tags.map(t=>`<span class="sd-tag">${t}</span>`).join('')}</div></div>
+  `;
+  el.classList.add('show');
+}
+function sw(id,btn){
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  document.getElementById('p-'+id).classList.add('on');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+}
+function toggleAdd(){
+  const f=document.getElementById('add-form');
+  f.style.display=f.style.display==='none'?'block':'none';
+}
+function selType(el,type){
+  document.querySelectorAll('.af-type').forEach(t=>t.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function testConn(){
+  document.getElementById('test-result').classList.add('show');
+}
+document.querySelectorAll('.src-toggle').forEach(t=>{
+  t.onclick=()=>t.classList.toggle('off');
+});
+</script>
+</body>
+</html>

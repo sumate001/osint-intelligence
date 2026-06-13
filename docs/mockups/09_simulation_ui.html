@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OSINT//DESK — Scenario Simulation</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0D0F14;--sf:#13161D;--sf2:#191D26;--sf3:#1F2330;
+  --bd:#232838;--bd2:#2C3347;
+  --t:#C9D1E0;--t2:#7A869A;--t3:#445068;
+  --ac:#4B7BEC;--ac-d:#1A2B4A;
+  --gn:#1E8449;--gn-d:#0D2318;
+  --yw:#B7860D;--yw-d:#2A1F08;
+  --rd:#C0392B;--rd-d:#2A1010;
+  --pu:#7D3C98;--pu-d:#2A1040;
+  --tl:#16A085;--tl-d:#0A2620;
+  --or:#CA6F1E;--or-d:#2A1808;
+  --mono:'IBM Plex Mono',monospace;
+  --thai:'Noto Sans Thai',sans-serif;
+}
+body{background:var(--bg);color:var(--t);font-family:var(--thai);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.tb{height:44px;border-bottom:1px solid var(--bd);background:var(--sf);display:flex;align-items:center;padding:0 20px;gap:10px;flex-shrink:0}
+.logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.ld{width:7px;height:7px;border-radius:50%;background:var(--ac)}
+.tb-sep{color:var(--t3);font-size:16px;font-weight:300}
+.tb-title{font-size:13px;font-weight:600;color:var(--t)}
+.tb-badge{font-size:9px;padding:2px 7px;border-radius:3px;background:var(--pu-d);color:var(--pu);font-family:var(--mono)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tb-btn{padding:5px 12px;border-radius:5px;border:1px solid var(--bd2);background:var(--sf2);color:var(--t2);font-size:11px;cursor:pointer;font-family:var(--thai)}
+.tb-btn:hover{color:var(--t);border-color:var(--bd)}
+.tb-btn.primary{background:var(--pu-d);border-color:var(--pu);color:var(--pu)}
+
+/* MAIN LAYOUT */
+.main{flex:1;display:flex;overflow:hidden}
+.left-panel{width:300px;border-right:1px solid var(--bd);background:var(--sf);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.lp-head{padding:14px 16px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.lp-title{font-size:12px;font-weight:600;color:var(--t);margin-bottom:3px}
+.lp-sub{font-size:11px;color:var(--t3);font-family:var(--mono)}
+.lp-body{flex:1;overflow-y:auto;padding:12px 14px}
+.lp-body::-webkit-scrollbar{width:3px}
+.lp-body::-webkit-scrollbar-thumb{background:var(--bd2)}
+.sec-label{font-size:9px;font-family:var(--mono);color:var(--t3);letter-spacing:.08em;margin:12px 0 6px}
+.seed-item{background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:9px 11px;margin-bottom:5px;font-size:12px}
+.seed-head{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.seed-ico{font-size:14px}
+.seed-name{font-size:12px;font-weight:500;flex:1}
+.seed-status{font-size:9px;padding:1px 6px;border-radius:3px;font-family:var(--mono)}
+.seed-ok{background:var(--gn-d);color:var(--gn)}
+.seed-pending{background:var(--yw-d);color:var(--yw)}
+.seed-meta{font-size:10px;color:var(--t3)}
+.config-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);font-size:12px}
+.config-row:last-child{border-bottom:none}
+.cfg-label{color:var(--t2)}
+.cfg-val{font-family:var(--mono);font-size:11px;color:var(--t)}
+.cfg-select{background:var(--sf2);border:1px solid var(--bd2);border-radius:4px;padding:3px 7px;color:var(--t);font-size:11px;font-family:var(--mono)}
+.run-btn{width:100%;padding:11px;border-radius:7px;background:var(--pu);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--thai);margin-top:14px;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.run-btn:hover{opacity:.85}
+.run-btn:disabled{opacity:.4;cursor:not-allowed}
+.progress-wrap{margin-top:12px;display:none}
+.progress-label{font-size:11px;color:var(--t2);margin-bottom:5px;display:flex;justify-content:space-between}
+.progress-bar{height:4px;background:var(--sf3);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--pu),var(--ac));border-radius:2px;transition:width .3s}
+.progress-steps{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.pstep{font-size:10px;font-family:var(--mono);color:var(--t3);display:flex;align-items:center;gap:6px}
+.pstep.done{color:var(--gn)}
+.pstep.active{color:var(--pu)}
+.pstep-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* CONTENT AREA */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.sub-tabs{display:flex;border-bottom:1px solid var(--bd);flex-shrink:0;padding:0 20px}
+.stab{padding:9px 14px;font-size:12px;cursor:pointer;color:var(--t3);border-bottom:2px solid transparent;transition:all .15s;user-select:none}
+.stab:hover{color:var(--t2)}
+.stab.on{color:var(--pu);border-bottom-color:var(--pu)}
+.body{flex:1;overflow-y:auto;padding:20px}
+.body::-webkit-scrollbar{width:5px}
+.body::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+.pane{display:none}
+.pane.on{display:block}
+
+/* SCENARIO CARDS */
+.scenario-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.scenario-title{font-size:14px;font-weight:600}
+.confidence-row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--t2)}
+.conf-badge{font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+.scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.sc-card{border:1px solid var(--bd2);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .2s}
+.sc-card:hover{transform:translateY(-2px)}
+.sc-card.selected{box-shadow:0 0 0 2px var(--pu)}
+.sc-head{padding:14px 16px 12px;border-bottom:1px solid var(--bd2)}
+.sc-type{font-size:9px;font-family:var(--mono);font-weight:600;letter-spacing:.1em;margin-bottom:6px}
+.sc-name{font-size:15px;font-weight:600;margin-bottom:4px}
+.sc-prob{font-size:12px;color:var(--t2)}
+.sc-body{padding:12px 16px}
+.sc-timeline{font-size:10px;font-family:var(--mono);color:var(--t3);margin-bottom:8px}
+.sc-bullets{list-style:none;display:flex;flex-direction:column;gap:6px}
+.sc-bullets li{font-size:12px;color:var(--t2);display:flex;gap:7px;line-height:1.5}
+.sc-bullets .dot{width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0;margin-top:7px}
+.sc-card.best .sc-head{background:linear-gradient(135deg,rgba(30,132,73,.12),transparent)}
+.sc-card.best .sc-type,.sc-card.best .dot{color:var(--gn)}
+.sc-card.base .sc-head{background:linear-gradient(135deg,rgba(183,134,13,.08),transparent)}
+.sc-card.base .sc-type,.sc-card.base .dot{color:var(--yw)}
+.sc-card.worst .sc-head{background:linear-gradient(135deg,rgba(192,57,43,.1),transparent)}
+.sc-card.worst .sc-type,.sc-card.worst .dot{color:var(--rd)}
+
+/* DETAIL PANEL */
+.detail-card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:14px}
+.dc-title{font-size:12px;font-weight:600;color:var(--t);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.dc-title span{font-size:10px;font-family:var(--mono);color:var(--t3);font-weight:400}
+.signal-list{display:flex;flex-direction:column;gap:8px}
+.signal-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--sf2);border-radius:7px;font-size:12px}
+.signal-ico{font-size:16px;flex-shrink:0}
+.signal-text{flex:1;color:var(--t2);line-height:1.5}
+.signal-urgency{font-size:9px;padding:1px 6px;border-radius:3px;font-family:var(--mono);flex-shrink:0;margin-top:1px}
+
+/* TIMELINE VIZ */
+.timeline-viz{display:flex;gap:0;margin-bottom:6px;position:relative}
+.tv-item{flex:1;padding:0 4px;text-align:center;position:relative}
+.tv-dot{width:10px;height:10px;border-radius:50%;border:2px solid;background:var(--sf);margin:0 auto 4px}
+.tv-line{position:absolute;top:4px;left:50%;right:-50%;height:2px;background:var(--bd2);z-index:0}
+.tv-item:last-child .tv-line{display:none}
+.tv-label{font-size:9px;font-family:var(--mono);color:var(--t3);margin-bottom:2px}
+.tv-event{font-size:10px;color:var(--t2);line-height:1.4}
+
+/* AGENTS VIZ */
+.agents-wrap{background:var(--sf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.agents-head{padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.agents-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.agent-cell{padding:10px 12px;border-right:1px solid var(--bd);border-bottom:1px solid var(--bd);font-size:12px}
+.agent-cell:nth-child(4n){border-right:none}
+.agent-cell:nth-last-child(-n+4){border-bottom:none}
+.agent-type{font-size:10px;font-family:var(--mono);color:var(--t3);margin-bottom:3px}
+.agent-name{font-size:12px;font-weight:500;margin-bottom:4px}
+.agent-stance{font-size:11px;line-height:1.5}
+.stance-neg{color:var(--rd)}
+.stance-neu{color:var(--t2)}
+.stance-pos{color:var(--gn)}
+
+/* COVERAGE STRATEGY */
+.strategy-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strat-item{background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.strat-label{font-size:9px;font-family:var(--mono);color:var(--t3);letter-spacing:.06em;margin-bottom:6px}
+.strat-content{font-size:12px;color:var(--t2);line-height:1.6}
+
+/* EMPTY STATE */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px}
+.empty-ico{font-size:48px;margin-bottom:16px;opacity:.4}
+.empty-title{font-size:15px;font-weight:600;color:var(--t2);margin-bottom:8px}
+.empty-sub{font-size:12px;color:var(--t3);max-width:40ch;line-height:1.6}
+
+/* TAGS */
+.tag{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--mono);display:inline-block;margin:2px}
+.vd{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--mono);font-weight:600;display:inline-block}
+.vd-r{background:var(--rd-d);color:var(--rd)}
+.vd-y{background:var(--yw-d);color:var(--yw)}
+.vd-g{background:var(--gn-d);color:var(--gn)}
+.vd-p{background:var(--pu-d);color:var(--pu)}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="tb">
+  <div class="logo"><div class="ld"></div>OSINT//DESK</div>
+  <span class="tb-sep">›</span>
+  <span class="tb-title">Scenario Simulation</span>
+  <span class="tb-badge">MiroFish Engine</span>
+  <div class="tb-right">
+    <span style="font-size:11px;color:var(--t3)">ABC Construction — ประมูลทางหลวง</span>
+    <span class="vd vd-r">PRIORITY 16/18</span>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- LEFT PANEL: Config + Seed -->
+<div class="left-panel">
+  <div class="lp-head">
+    <div class="lp-title">Simulation Setup</div>
+    <div class="lp-sub">seed · config · run</div>
+  </div>
+  <div class="lp-body">
+
+    <div class="sec-label">SEED MATERIALS</div>
+    <div class="seed-item">
+      <div class="seed-head">
+        <span class="seed-ico">📋</span>
+        <span class="seed-name">verified findings</span>
+        <span class="seed-status seed-ok">✓ ready</span>
+      </div>
+      <div class="seed-meta">2 claims verified · e-GP + DBD</div>
+    </div>
+    <div class="seed-item">
+      <div class="seed-head">
+        <span class="seed-ico">🕸</span>
+        <span class="seed-name">entity graph</span>
+        <span class="seed-status seed-ok">✓ ready</span>
+      </div>
+      <div class="seed-meta">6 entities · 9 relationships</div>
+    </div>
+    <div class="seed-item">
+      <div class="seed-head">
+        <span class="seed-ico">📅</span>
+        <span class="seed-name">event timeline</span>
+        <span class="seed-status seed-ok">✓ ready</span>
+      </div>
+      <div class="seed-meta">4 events · ก.พ. – มิ.ย. 2568</div>
+    </div>
+    <div class="seed-item">
+      <div class="seed-head">
+        <span class="seed-ico">🔎</span>
+        <span class="seed-name">Perplexica context</span>
+        <span class="seed-status seed-pending">⚠ optional</span>
+      </div>
+      <div class="seed-meta">background research</div>
+    </div>
+
+    <div class="sec-label">SIMULATION CONFIG</div>
+    <div class="config-row">
+      <span class="cfg-label">จำนวน agents</span>
+      <select class="cfg-select">
+        <option>500 (เร็ว ~3 นาที)</option>
+        <option selected>1,000 (แนะนำ ~7 นาที)</option>
+        <option>3,000 (ละเอียด ~20 นาที)</option>
+      </select>
+    </div>
+    <div class="config-row">
+      <span class="cfg-label">ช่วงเวลาจำลอง</span>
+      <select class="cfg-select">
+        <option>7 วัน</option>
+        <option selected>30 วัน</option>
+        <option>90 วัน</option>
+      </select>
+    </div>
+    <div class="config-row">
+      <span class="cfg-label">กลุ่ม agents</span>
+      <select class="cfg-select">
+        <option>สังคมทั่วไป</option>
+        <option selected>การเมือง + ธุรกิจ</option>
+        <option>โซเชียลมีเดีย</option>
+      </select>
+    </div>
+    <div class="config-row">
+      <span class="cfg-label">LLM model</span>
+      <span class="cfg-val">qwen3:8b (local)</span>
+    </div>
+
+    <button class="run-btn" id="run-btn" onclick="startSim()">
+      <span>▶</span> จำลองสถานการณ์
+    </button>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-label">
+        <span id="prog-label">กำลังประมวลผล...</span>
+        <span id="prog-pct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+      </div>
+      <div class="progress-steps" id="prog-steps">
+        <div class="pstep active" id="ps1"><div class="pstep-dot"></div>กำลังสกัด ontology จาก seed</div>
+        <div class="pstep" id="ps2"><div class="pstep-dot"></div>สร้าง knowledge graph (Neo4j)</div>
+        <div class="pstep" id="ps3"><div class="pstep-dot"></div>สร้าง agents 1,000 ตัว</div>
+        <div class="pstep" id="ps4"><div class="pstep-dot"></div>รัน simulation 30 วัน</div>
+        <div class="pstep" id="ps5"><div class="pstep-dot"></div>ReportAgent วิเคราะห์ผล</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content" id="content">
+  <!-- EMPTY STATE -->
+  <div class="body pane on" id="pane-empty">
+    <div class="empty">
+      <div class="empty-ico">🌐</div>
+      <div class="empty-title">พร้อมจำลองสถานการณ์</div>
+      <div class="empty-sub">ระบบเตรียม seed materials จากการสืบสวนครบแล้ว กด "จำลองสถานการณ์" เพื่อให้ MiroFish ประเมินผลกระทบที่น่าจะเกิดขึ้น</div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div style="display:none;flex:1;flex-direction:column;overflow:hidden" id="results-wrap">
+    <div class="sub-tabs">
+      <div class="stab on" onclick="sw('scenarios',this)">🎯 Scenarios</div>
+      <div class="stab" onclick="sw('timeline',this)">📅 Timeline</div>
+      <div class="stab" onclick="sw('agents',this)">👥 Agents</div>
+      <div class="stab" onclick="sw('strategy',this)">📡 Coverage Strategy</div>
+    </div>
+    <div class="body">
+
+      <!-- SCENARIOS TAB -->
+      <div class="pane on" id="pane-scenarios">
+        <div class="scenario-header">
+          <div class="scenario-title">Impact Assessment — ABC Construction</div>
+          <div class="confidence-row">
+            <span style="color:var(--t3)">ความเชื่อมั่น:</span>
+            <span class="conf-badge" style="background:var(--gn-d);color:var(--gn)">HIGH · seed verified</span>
+            <span style="font-size:10px;color:var(--t3);font-family:var(--mono)">1,000 agents · 30d simulation</span>
+          </div>
+        </div>
+
+        <div class="scenario-grid">
+          <!-- BEST -->
+          <div class="sc-card best" onclick="selectScenario(this,'best')">
+            <div class="sc-head">
+              <div class="sc-type">BEST CASE</div>
+              <div class="sc-name">ถูกสอบสวน รับผิดชอบ</div>
+              <div class="sc-prob">ความน่าจะเป็น <strong>28%</strong></div>
+            </div>
+            <div class="sc-body">
+              <div class="sc-timeline">เกิดขึ้นใน 2–4 สัปดาห์</div>
+              <ul class="sc-bullets" style="color:var(--gn)">
+                <li><span class="dot"></span>ป.ป.ช. รับเรื่องสอบสวนภายใน 14 วัน</li>
+                <li><span class="dot"></span>กรมทางหลวงทบทวนสัญญา</li>
+                <li><span class="dot"></span>สังคมตอบรับบวก ความน่าเชื่อถือห้องข่าวสูงขึ้น</li>
+              </ul>
+            </div>
+          </div>
+          <!-- BASE -->
+          <div class="sc-card base selected" onclick="selectScenario(this,'base')">
+            <div class="sc-head">
+              <div class="sc-type">BASE CASE · น่าจะเป็นที่สุด</div>
+              <div class="sc-name">ยืดเยื้อ ถูกเมิน</div>
+              <div class="sc-prob">ความน่าจะเป็น <strong>54%</strong></div>
+            </div>
+            <div class="sc-body">
+              <div class="sc-timeline">เกิดขึ้นใน 4–8 สัปดาห์</div>
+              <ul class="sc-bullets" style="color:var(--yw)">
+                <li><span class="dot"></span>ข่าวถูกปฏิเสธ "กระบวนการถูกต้อง"</li>
+                <li><span class="dot"></span>กระแสสังคมจุดไฟได้ 1–2 สัปดาห์ แล้วซา</li>
+                <li><span class="dot"></span>ต้องการหลักฐาน missing links เพิ่ม</li>
+              </ul>
+            </div>
+          </div>
+          <!-- WORST -->
+          <div class="sc-card worst" onclick="selectScenario(this,'worst')">
+            <div class="sc-head">
+              <div class="sc-type">WORST CASE</div>
+              <div class="sc-name">ฟ้องหมิ่นประมาท</div>
+              <div class="sc-prob">ความน่าจะเป็น <strong>18%</strong></div>
+            </div>
+            <div class="sc-body">
+              <div class="sc-timeline">เกิดขึ้นใน 1–3 สัปดาห์</div>
+              <ul class="sc-bullets" style="color:var(--rd)">
+                <li><span class="dot"></span>ABC ฟ้องร้องหากเผยแพร่ก่อนพร้อม</li>
+                <li><span class="dot"></span>หลักฐาน partial ไม่เพียงพอต่อสู้คดี</li>
+                <li><span class="dot"></span>ต้องการ THP Road + Whois ยืนยันก่อน</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIGNAL TRACKING -->
+        <div class="detail-card">
+          <div class="dc-title">📡 Signals ที่ต้องเฝ้าดู <span>(base case)</span></div>
+          <div class="signal-list">
+            <div class="signal-item">
+              <div class="signal-ico">📊</div>
+              <div class="signal-text">ราคาหุ้นบริษัทรับเหมาในกลุ่ม SET — ถ้าลงแรงหลังข่าวออก แสดงว่าตลาดรับรู้ผลกระทบแล้ว</div>
+              <span class="signal-urgency" style="background:var(--rd-d);color:var(--rd)">HIGH</span>
+            </div>
+            <div class="signal-item">
+              <div class="signal-ico">🏛</div>
+              <div class="signal-text">ท่าทีอย่างเป็นทางการจากกรมทางหลวงและกระทรวง — ถ้าเงียบ แปลว่ากำลังประเมินอยู่</div>
+              <span class="signal-urgency" style="background:var(--yw-d);color:var(--yw)">MED</span>
+            </div>
+            <div class="signal-item">
+              <div class="signal-ico">📱</div>
+              <div class="signal-text">กระแส Twitter/X และ Pantip — sentiment ช่วย predict ว่าข่าวจะอยู่ได้นานแค่ไหน</div>
+              <span class="signal-urgency" style="background:var(--yw-d);color:var(--yw)">MED</span>
+            </div>
+            <div class="signal-item">
+              <div class="signal-ico">⚖</div>
+              <div class="signal-text">ฝ่ายค้านนำไปอภิปราย — ถ้าเกิดขึ้น คดีจะอยู่ในข่าวอีกอย่างน้อย 2–3 สัปดาห์</div>
+              <span class="signal-urgency" style="background:var(--gn-d);color:var(--gn)">LOW</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIMELINE TAB -->
+      <div class="pane" id="pane-timeline">
+        <div style="font-size:13px;font-weight:600;margin-bottom:16px">Simulated Event Timeline — 30 วัน (Base Case)</div>
+        <div class="detail-card" style="padding:20px">
+          <div class="timeline-viz">
+            <div class="tv-item">
+              <div class="tv-line"></div>
+              <div class="tv-dot" style="border-color:var(--rd)"></div>
+              <div class="tv-label">D+0</div>
+              <div class="tv-event" style="color:var(--rd)">ข่าวออกอากาศ</div>
+            </div>
+            <div class="tv-item">
+              <div class="tv-line"></div>
+              <div class="tv-dot" style="border-color:var(--yw)"></div>
+              <div class="tv-label">D+1–3</div>
+              <div class="tv-event">โซเชียลจุดกระแส กระทรวงปฏิเสธ</div>
+            </div>
+            <div class="tv-item">
+              <div class="tv-line"></div>
+              <div class="tv-dot" style="border-color:var(--yw)"></div>
+              <div class="tv-label">D+5–7</div>
+              <div class="tv-event">ฝ่ายค้านหยิบยก กระแสสูงสุด</div>
+            </div>
+            <div class="tv-item">
+              <div class="tv-line"></div>
+              <div class="tv-dot" style="border-color:var(--t3)"></div>
+              <div class="tv-label">D+10–14</div>
+              <div class="tv-event">กระแสเริ่มซา ไม่มีหลักฐานใหม่</div>
+            </div>
+            <div class="tv-item">
+              <div class="tv-dot" style="border-color:var(--t3)"></div>
+              <div class="tv-label">D+21–30</div>
+              <div class="tv-event">คดียืดเยื้อ รอ ป.ป.ช.</div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-card">
+          <div class="dc-title">📌 จุดเปลี่ยน (Pivot Points) <span>ที่อาจเปลี่ยน scenario</span></div>
+          <div class="signal-list">
+            <div class="signal-item">
+              <div class="signal-ico">🔑</div>
+              <div class="signal-text"><strong>ถ้าพบ THP Road เคยประมูลแข่งกับ ABC</strong> → base case เลื่อนเป็น best case ทันที probability เพิ่มเป็น 65%</div>
+              <span class="signal-urgency" style="background:var(--gn-d);color:var(--gn)">KEY</span>
+            </div>
+            <div class="signal-item">
+              <div class="signal-ico">⚠</div>
+              <div class="signal-text"><strong>ถ้าออกอากาศก่อนยืนยัน Whois</strong> → worst case risk เพิ่มจาก 18% เป็น 41%</div>
+              <span class="signal-urgency" style="background:var(--rd-d);color:var(--rd)">RISK</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENTS TAB -->
+      <div class="pane" id="pane-agents">
+        <div style="font-size:13px;font-weight:600;margin-bottom:16px">Agent Perspectives — ตัวอย่าง simulation output</div>
+        <div class="agents-wrap">
+          <div class="agents-head">
+            <span style="font-size:11px;color:var(--t2)">1,000 agents · กลุ่ม: การเมือง + ธุรกิจ</span>
+            <span style="font-size:10px;font-family:var(--mono);color:var(--t3)">แสดงตัวอย่าง 8 ตัว</span>
+          </div>
+          <div class="agents-grid">
+            <div class="agent-cell">
+              <div class="agent-type">นักการเมืองฝ่ายค้าน</div>
+              <div class="agent-name">Agent #047</div>
+              <div class="agent-stance stance-neg">หยิบยกในอภิปราย ขอข้อมูลเพิ่ม</div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-type">นักธุรกิจรับเหมา</div>
+              <div class="agent-name">Agent #112</div>
+              <div class="agent-stance stance-neg">กังวลว่าจะกระทบอุตสาหกรรม</div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-type">นักวิชาการด้านงบประมาณ</div>
+              <div class="agent-name">Agent #203</div>
+              <div class="agent-stance stance-neg">ชี้ความผิดปกติของมูลค่าสัญญา</div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-type">ข้าราชการกรมทางหลวง</div>
+              <div class="agent-name">Agent #334</div>
+              <div class="agent-stance stance-neu">รอคำสั่งผู้บังคับบัญชา ไม่แสดงความเห็น</div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-type">นักลงทุน SET</div>
+              <div class="agent-name">Agent #421</div>
+              <div class="agent-stance stance-neg">ขายหุ้นกลุ่มรับเหมา รอดูสถานการณ์</div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-type">นักข่าวสำนักอื่น</div>
+              <div class="agent-name">Agent #508</div>
+              <div class="agent-stance stance-neu">ติดตาม รอยืนยันก่อนรายงาน</div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-type">ผู้ใช้โซเชียลทั่วไป</div>
+              <div class="agent-name">Agent #677</div>
+              <div class="agent-stance stance-neg">แชร์ข่าว โกรธ แท็กนักการเมือง</div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-type">รัฐมนตรีที่เกี่ยวข้อง</div>
+              <div class="agent-name">Agent #890</div>
+              <div class="agent-stance stance-neu">ออกแถลงการณ์ว่ากระบวนการถูกต้อง</div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-card">
+          <div class="dc-title">📊 Sentiment Distribution <span>ณ D+7</span></div>
+          <div style="display:flex;gap:16px;align-items:center;font-size:12px">
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <div style="height:8px;border-radius:4px;background:var(--rd);flex:1"></div>
+                <span style="font-family:var(--mono);color:var(--rd);min-width:40px">62% ลบ</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <div style="height:8px;border-radius:4px;background:var(--t3);width:25%;"></div>
+                <span style="font-family:var(--mono);color:var(--t2);min-width:40px">25% เฉย</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="height:8px;border-radius:4px;background:var(--gn);width:13%;"></div>
+                <span style="font-family:var(--mono);color:var(--gn);min-width:40px">13% บวก</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--t2);max-width:200px;line-height:1.6">กระแสลบเกิดจาก frustration ต่อการทุจริตสะสม ไม่ใช่ข่าวนี้อย่างเดียว — เหมาะ publish ช่วงนี้</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STRATEGY TAB -->
+      <div class="pane" id="pane-strategy">
+        <div style="font-size:13px;font-weight:600;margin-bottom:16px">Coverage Strategy — คำแนะนำจาก simulation</div>
+        <div style="background:linear-gradient(135deg,rgba(125,60,152,.1),transparent);border:1px solid var(--pu-d);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.7;color:var(--t2)">
+          <strong style="color:var(--pu)">คำแนะนำหลัก:</strong> ยืนยัน THP Road ใน e-GP ก่อนออกอากาศ — หลักฐานชิ้นนี้เพิ่ม impact จาก base เป็น best case และลด legal risk จาก 18% เหลือต่ำกว่า 5%
+        </div>
+        <div class="strategy-grid">
+          <div class="strat-item">
+            <div class="strat-label">🕒 TIMING</div>
+            <div class="strat-content">ออกอากาศหลังยืนยัน THP Road ภายใน 48–72 ชั่วโมง — กระแสโซเชียลยังร้อนอยู่ ไม่ควรรอเกิน 1 สัปดาห์</div>
+          </div>
+          <div class="strat-item">
+            <div class="strat-label">📐 FORMAT</div>
+            <div class="strat-content">สารคดีสืบสวน 15–20 นาที พร้อม interactive network graph บนเว็บ — เพิ่มความน่าเชื่อถือและ shareability</div>
+          </div>
+          <div class="strat-item">
+            <div class="strat-label">📌 ANGLE</div>
+            <div class="strat-content">เน้นที่ "บริษัทอายุ 3 ปี ทุน 1 ล้าน ได้งาน 2.8 พันล้าน" — เข้าใจง่าย emotional impact สูง แต่ต้อง verified ครบ</div>
+          </div>
+          <div class="strat-item">
+            <div class="strat-label">🔍 FOLLOW-UP</div>
+            <div class="strat-content">เตรียมรายงานต่อเนื่อง 3 ชิ้น: (1) ปฏิกิริยา ป.ป.ช. (2) THP Road network (3) สรุปผลสอบ</div>
+          </div>
+          <div class="strat-item">
+            <div class="strat-label">⚠ LEGAL NOTE</div>
+            <div class="strat-content">ยังไม่ยืนยัน missing links 2 ชิ้น — ห้ามใส่ "สรุปว่าโกง" ใช้ "ตรวจสอบพบข้อมูลน่าสนใจ" เท่านั้น</div>
+          </div>
+          <div class="strat-item">
+            <div class="strat-label">📡 MONITOR</div>
+            <div class="strat-content">เพิ่ม ABC Construction + นายสมชาย เข้า Watchlist — simulation ชี้ว่ามีการเคลื่อนไหวหลังข่าวออก</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</div><!-- end main -->
+
+<script>
+let simRunning = false;
+
+function startSim() {
+  if (simRunning) return;
+  simRunning = true;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> กำลังจำลอง...';
+
+  const pw = document.getElementById('progress-wrap');
+  pw.style.display = 'block';
+
+  const steps = [
+    {id:'ps1', label:'กำลังสกัด ontology...', pct:15},
+    {id:'ps2', label:'สร้าง knowledge graph...', pct:30},
+    {id:'ps3', label:'สร้าง agents 1,000 ตัว...', pct:50},
+    {id:'ps4', label:'รัน simulation 30 วัน...', pct:80},
+    {id:'ps5', label:'วิเคราะห์ผล...', pct:100},
+  ];
+
+  let i = 0;
+  function doStep() {
+    if (i > 0) {
+      document.getElementById(steps[i-1].id).className = 'pstep done';
+    }
+    if (i < steps.length) {
+      const s = steps[i];
+      document.getElementById(s.id).className = 'pstep active';
+      document.getElementById('prog-label').textContent = s.label;
+      document.getElementById('prog-pct').textContent = s.pct + '%';
+      document.getElementById('prog-fill').style.width = s.pct + '%';
+      i++;
+      setTimeout(doStep, i === 4 ? 1800 : 900);
+    } else {
+      setTimeout(showResults, 600);
+    }
+  }
+  doStep();
+}
+
+function showResults() {
+  document.getElementById('pane-empty').className = 'body pane';
+  document.getElementById('run-btn').innerHTML = '<span>✓</span> ดูผลลัพธ์';
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('run-btn').style.background = 'var(--gn)';
+  document.getElementById('results-wrap').style.display = 'flex';
+}
+
+function sw(id, btn) {
+  document.querySelectorAll('.pane').forEach(p => {
+    if (p.id.startsWith('pane-')) p.classList.remove('on');
+  });
+  document.getElementById('pane-' + id).classList.add('on');
+  document.querySelectorAll('.stab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+
+function selectScenario(card, type) {
+  document.querySelectorAll('.sc-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+# OSINT//DESK — Phase 0 dev stack
+# Ollama รันบนเครื่อง host (Ubuntu) อยู่แล้ว — ไม่รันใน compose
+# services ทั้งหมดชี้ Ollama ที่ host ผ่าน host.docker.internal หรือ IP ของเครื่อง
+#
+# ใช้งาน: docker compose -f docker-compose.dev.yml up -d
+# ปิด:    docker compose -f docker-compose.dev.yml down
+
+name: osintdesk
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: osint-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-osintdesk}
+      POSTGRES_USER: ${POSTGRES_USER:-osint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-osint}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: osint-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: osint-neo4j
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-changeme123}
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: osint-meili
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-changeme_master_key}
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili-data:/meili_data
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: osint-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-osint}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-changeme123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: osint-searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config/searxng:/etc/searxng
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: osint-api
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/api:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # ให้ container เห็น Ollama บน host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: osint-worker
+    env_file: .env
+    volumes:
+      - ./services/api:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+      - api
+    command: celery -A app.worker worker --loglevel=info
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: osint-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/frontend:/app
+      - /app/node_modules
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    command: pnpm dev
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  redis-data:
+  neo4j-data:
+  meili-data:
+  minio-data:

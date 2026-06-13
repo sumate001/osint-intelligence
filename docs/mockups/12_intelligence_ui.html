@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OSINT//DESK — Intelligence Cycle Modules</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0D0F14;--sf:#13161D;--sf2:#191D26;--sf3:#1F2330;
+  --bd:#232838;--bd2:#2C3347;
+  --t:#C9D1E0;--t2:#7A869A;--t3:#445068;
+  --ac:#4B7BEC;--ac-d:#1A2B4A;
+  --gn:#1E8449;--gn-d:#0D2318;
+  --yw:#B7860D;--yw-d:#2A1F08;
+  --rd:#C0392B;--rd-d:#2A1010;
+  --pu:#7D3C98;--pu-d:#2A1040;--pu-s:#B98FD1;
+  --tl:#16A085;--tl-d:#0A2620;
+  --or:#CA6F1E;--or-d:#2A1808;
+  --mono:'IBM Plex Mono',monospace;
+  --thai:'Noto Sans Thai',sans-serif;
+}
+body{background:var(--bg);color:var(--t);font-family:var(--thai);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.tb{height:44px;border-bottom:1px solid var(--bd);background:var(--sf);display:flex;align-items:center;padding:0 20px;gap:10px;flex-shrink:0}
+.logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.ld{width:7px;height:7px;border-radius:50%;background:var(--ac)}
+.tb-badge{font-size:9px;padding:2px 8px;border-radius:3px;background:var(--pu-d);color:var(--pu-s);font-family:var(--mono)}
+.main{flex:1;display:flex;overflow:hidden}
+.sb{width:218px;border-right:1px solid var(--bd);background:var(--sf);flex-shrink:0;overflow-y:auto;padding:8px 0}
+.sb::-webkit-scrollbar{width:3px}.sb::-webkit-scrollbar-thumb{background:var(--bd2)}
+.sb-lbl{font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.08em;padding:10px 14px 4px}
+.si{display:flex;align-items:flex-start;gap:9px;padding:8px 14px;cursor:pointer;color:var(--t2);font-size:12px;transition:all .15s;border-left:2px solid transparent;user-select:none}
+.si:hover{background:var(--sf2);color:var(--t)}
+.si.on{background:var(--sf2);color:var(--t);border-left-color:var(--pu)}
+.si-ico{font-size:14px;width:18px;text-align:center;flex-shrink:0;margin-top:1px}
+.si-txt{flex:1}
+.si-name{font-size:12px;font-weight:500;line-height:1.3}
+.si-desc{font-size:10px;color:var(--t3);margin-top:1px;line-height:1.3}
+.sb-div{height:1px;background:var(--bd);margin:6px 14px}
+.content{flex:1;overflow-y:auto;padding:0}
+.content::-webkit-scrollbar{width:5px}.content::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+.mod{display:none;padding:22px 26px;max-width:1000px}
+.mod.on{display:block}
+.mh{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--bd)}
+.mh-title{font-size:16px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+.mh-num{font-size:10px;font-family:var(--mono);color:var(--pu-s);background:var(--pu-d);padding:2px 8px;border-radius:4px}
+.mh-sub{font-size:12px;color:var(--t2);line-height:1.6}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.ch{padding:10px 16px;border-bottom:1px solid var(--bd);font-size:10px;color:var(--t3);font-family:var(--mono);letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+.cb{padding:14px 16px}
+.sc2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.sc3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.sc4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.sv{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px}
+.sl{font-size:10px;color:var(--t2);font-family:var(--mono);letter-spacing:.04em;margin-bottom:5px}
+.sn{font-size:20px;font-weight:600;font-family:var(--mono);line-height:1}
+.ss{font-size:11px;color:var(--t3);margin-top:4px}
+.btn-p{padding:6px 13px;border-radius:5px;background:var(--ac);color:#fff;border:none;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--thai)}
+.btn-s{padding:6px 13px;border-radius:5px;background:var(--sf2);color:var(--t);border:1px solid var(--bd2);font-size:12px;cursor:pointer;font-family:var(--thai)}
+.btn-pu{padding:6px 13px;border-radius:5px;background:var(--pu-d);color:var(--pu-s);border:1px solid var(--pu);font-size:12px;cursor:pointer;font-family:var(--thai)}
+.vd{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--mono);font-weight:600;display:inline-block}
+.tg{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--mono);display:inline-block;margin:2px}
+.status{font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono);display:inline-flex;align-items:center;gap:4px}
+.s-ok{background:var(--gn-d);color:var(--gn)}.s-warn{background:var(--yw-d);color:var(--yw)}
+.s-err{background:var(--rd-d);color:var(--rd)}.s-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* PIR */
+.pir-item{padding:13px 16px;border-bottom:1px solid var(--bd)}
+.pir-item:last-child{border-bottom:none}
+.pir-q{font-size:13px;font-weight:500;margin-bottom:6px;display:flex;align-items:flex-start;gap:8px}
+.pir-prog{height:5px;background:var(--sf3);border-radius:3px;overflow:hidden;margin:8px 0}
+.pir-fill{height:100%;border-radius:3px}
+.pir-eei{display:flex;flex-direction:column;gap:4px;margin-top:8px;padding-left:8px;border-left:2px solid var(--bd2)}
+.eei{font-size:11px;color:var(--t2);display:flex;align-items:center;gap:6px}
+.eei-check{width:13px;height:13px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0}
+
+/* RELIABILITY MATRIX */
+.adm-grid{display:grid;grid-template-columns:auto repeat(6,1fr);gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.adm-cell{background:var(--sf);padding:8px;text-align:center;font-size:11px;font-family:var(--mono)}
+.adm-hd{background:var(--sf2);color:var(--t3);font-size:10px}
+.adm-rate{cursor:pointer;transition:background .12s}
+.adm-rate:hover{background:var(--sf3)}
+.adm-rate.sel{background:var(--pu-d);color:var(--pu-s)}
+.src-rel{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bd)}
+.src-rel:last-child{border-bottom:none}
+.rel-badge{font-family:var(--mono);font-size:14px;font-weight:600;padding:4px 10px;border-radius:6px;flex-shrink:0}
+
+/* COLLABORATION */
+.activity{display:flex;gap:10px;padding:9px 16px;border-bottom:1px solid var(--bd);font-size:12px;align-items:flex-start}
+.activity:last-child{border-bottom:none}
+.act-ava{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0}
+.act-body{flex:1}
+.act-meta{font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:2px}
+.comment{background:var(--sf2);border-radius:7px;padding:9px 11px;margin-bottom:6px}
+.comment-head{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.dissent{border-left:2px solid var(--yw);background:var(--yw-d);border-radius:0 7px 7px 0;padding:9px 11px;margin-top:6px}
+
+/* CONFIDENCE */
+.conf-item{padding:12px 16px;border-bottom:1px solid var(--bd)}
+.conf-item:last-child{border-bottom:none}
+.conf-claim{font-size:12px;line-height:1.5;margin-bottom:6px}
+.conf-level{display:inline-flex;align-items:center;gap:5px;font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-weight:600}
+.ach-table{width:100%;border-collapse:collapse;font-size:11px}
+.ach-table th{background:var(--sf2);padding:7px 9px;text-align:left;font-size:9px;font-family:var(--mono);color:var(--t3);border-bottom:1px solid var(--bd)}
+.ach-table td{padding:7px 9px;border-bottom:1px solid var(--bd)}
+.ach-mark{font-family:var(--mono);font-weight:600}
+
+/* DECEPTION */
+.decep-card{padding:13px 16px;border-bottom:1px solid var(--bd)}
+.decep-card:last-child{border-bottom:none}
+.decep-q{font-size:12px;color:var(--t2);line-height:1.6;display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
+.decep-flag{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--rd-d);border-radius:7px;font-size:12px;color:var(--rd)}
+.bot-meter{display:flex;align-items:center;gap:8px;margin:6px 0}
+.bot-bar{flex:1;height:6px;background:var(--sf3);border-radius:3px;overflow:hidden}
+
+/* KNOWLEDGE BASE */
+.kb-search{display:flex;gap:8px;margin-bottom:14px}
+.kb-inp{flex:1;background:var(--sf2);border:1px solid var(--bd2);border-radius:6px;padding:9px 12px;color:var(--t);font-size:12px;font-family:var(--thai)}
+.kb-inp:focus{outline:none;border-color:var(--ac)}
+.entity-history{padding:12px 16px;border-bottom:1px solid var(--bd)}
+.entity-history:last-child{border-bottom:none}
+.eh-name{font-size:13px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.eh-cases{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.eh-case{display:flex;align-items:center;gap:8px;font-size:11px;padding:6px 9px;background:var(--sf2);border-radius:5px;cursor:pointer}
+.eh-case:hover{background:var(--sf3)}
+.pattern-alert{display:flex;gap:10px;padding:11px 14px;background:linear-gradient(135deg,rgba(125,60,152,.12),transparent);border:1px solid var(--pu-d);border-radius:8px;margin-bottom:10px;font-size:12px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="tb">
+  <div class="logo"><div class="ld"></div>OSINT//DESK<span class="tb-badge">Intelligence Cycle</span></div>
+  <span style="font-size:12px;color:var(--t2)">6 modules เติมเต็มมาตรฐานงานข่าวกรอง</span>
+</div>
+
+<div class="main">
+<div class="sb">
+  <div class="sb-lbl">DIRECTION</div>
+  <div class="si on" onclick="gm('pir',this)"><span class="si-ico">🎯</span><span class="si-txt"><div class="si-name">Requirements / PIR</div><div class="si-desc">กำหนดโจทย์ข่าวกรอง</div></span></div>
+  <div class="sb-div"></div>
+  <div class="sb-lbl">COLLECTION</div>
+  <div class="si" onclick="gm('reliability',this)"><span class="si-ico">⭐</span><span class="si-txt"><div class="si-name">Source Reliability</div><div class="si-desc">NATO Admiralty Code</div></span></div>
+  <div class="sb-div"></div>
+  <div class="sb-lbl">ANALYSIS</div>
+  <div class="si" onclick="gm('collab',this)"><span class="si-ico">👥</span><span class="si-txt"><div class="si-name">Collaboration</div><div class="si-desc">หลาย analyst ทำร่วมกัน</div></span></div>
+  <div class="si" onclick="gm('confidence',this)"><span class="si-ico">📊</span><span class="si-txt"><div class="si-name">Analytic Confidence</div><div class="si-desc">ความมั่นใจ + dissent</div></span></div>
+  <div class="si" onclick="gm('deception',this)"><span class="si-ico">🎭</span><span class="si-txt"><div class="si-name">Deception Detection</div><div class="si-desc">ตรวจ disinformation</div></span></div>
+  <div class="sb-div"></div>
+  <div class="sb-lbl">MEMORY</div>
+  <div class="si" onclick="gm('knowledge',this)"><span class="si-ico">🧠</span><span class="si-txt"><div class="si-name">Knowledge Base</div><div class="si-desc">institutional memory</div></span></div>
+</div>
+
+<div class="content">
+
+<!-- ══ 1. PIR ══ -->
+<div class="mod on" id="m-pir">
+  <div class="mh">
+    <div class="mh-title">🎯 Requirements & Tasking <span class="mh-num">PIR · Module 1</span></div>
+    <div class="mh-sub">Intelligence Lead กำหนด Priority Intelligence Requirements — โจทย์ที่ระบบไปหาคำตอบ แทนที่จะรอข้อมูลไหลเข้ามาอย่างเดียว</div>
+  </div>
+  <div class="sc3">
+    <div class="sv"><div class="sl">ACTIVE PIR</div><div class="sn" style="color:var(--pu-s)">4</div><div class="ss">กำลังหาคำตอบ</div></div>
+    <div class="sv"><div class="sl">ANSWERED</div><div class="sn" style="color:var(--gn)">12</div><div class="ss">เดือนนี้</div></div>
+    <div class="sv"><div class="sl">NEAR DEADLINE</div><div class="sn" style="color:var(--yw)">2</div><div class="ss">ภายใน 3 วัน</div></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn-pu">+ สร้าง PIR ใหม่</button></div>
+  <div class="card">
+    <div class="ch"><span>ACTIVE REQUIREMENTS</span></div>
+    <div class="pir-item">
+      <div class="pir-q"><span class="vd" style="background:var(--rd-d);color:var(--rd)">P1</span><div style="flex:1">บริษัท ABC Construction มีความเชื่อมโยงกับเจ้าหน้าที่รัฐในการประมูลหรือไม่ และเครือข่ายครอบคลุมแค่ไหน</div></div>
+      <div class="pir-prog"><div class="pir-fill" style="width:68%;background:var(--yw)"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);font-family:var(--mono)"><span>68% answered · 4/6 EEI</span><span>deadline: 15 มิ.ย.</span></div>
+      <div class="pir-eei">
+        <div class="eei"><span class="eei-check" style="background:var(--gn-d);color:var(--gn)">✓</span>ใครเป็นกรรมการและผู้ถือหุ้น ABC Construction</div>
+        <div class="eei"><span class="eei-check" style="background:var(--gn-d);color:var(--gn)">✓</span>ABC ชนะประมูลกี่โครงการในรอบ 12 เดือน</div>
+        <div class="eei"><span class="eei-check" style="background:var(--yw-d);color:var(--yw)">⋯</span>กรรมการมีความเชื่อมโยงกับเจ้าหน้าที่กรมทางหลวงหรือไม่</div>
+        <div class="eei"><span class="eei-check" style="background:var(--rd-d);color:var(--rd)">✗</span>THP Road เคยประมูลแข่งกับ ABC หรือไม่</div>
+      </div>
+    </div>
+    <div class="pir-item">
+      <div class="pir-q"><span class="vd" style="background:var(--yw-d);color:var(--yw)">P2</span><div style="flex:1">MOU พลังงานจีน-ไทยมีเงื่อนไขที่เสียเปรียบประเทศหรือผลประโยชน์ทับซ้อนหรือไม่</div></div>
+      <div class="pir-prog"><div class="pir-fill" style="width:35%;background:var(--ac)"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);font-family:var(--mono)"><span>35% answered · 2/6 EEI</span><span>deadline: 22 มิ.ย.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 2. SOURCE RELIABILITY ══ -->
+<div class="mod" id="m-reliability">
+  <div class="mh">
+    <div class="mh-title">⭐ Source Reliability <span class="mh-num">NATO Admiralty · Module 2</span></div>
+    <div class="mh-sub">ให้คะแนนแหล่งข้อมูลสองมิติ — ความน่าเชื่อถือของแหล่ง (A-F) และของข้อมูล (1-6) ปรับอัตโนมัติตามประวัติความแม่นยำ</div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>ADMIRALTY CODE MATRIX</span><span>คลิกเพื่อดูคำอธิบาย</span></div>
+    <div class="cb">
+      <div class="adm-grid">
+        <div class="adm-cell adm-hd"></div>
+        <div class="adm-cell adm-hd">1<br>ยืนยัน</div><div class="adm-cell adm-hd">2<br>น่าจะจริง</div><div class="adm-cell adm-hd">3<br>อาจจริง</div><div class="adm-cell adm-hd">4<br>น่าสงสัย</div><div class="adm-cell adm-hd">5<br>ไม่น่าจริง</div><div class="adm-cell adm-hd">6<br>?</div>
+        <div class="adm-cell adm-hd">A เชื่อถือได้</div>
+        <div class="adm-cell adm-rate">A1</div><div class="adm-cell adm-rate">A2</div><div class="adm-cell adm-rate">A3</div><div class="adm-cell adm-rate">A4</div><div class="adm-cell adm-rate">A5</div><div class="adm-cell adm-rate">A6</div>
+        <div class="adm-cell adm-hd">B ปกติ</div>
+        <div class="adm-cell adm-rate">B1</div><div class="adm-cell adm-rate sel">B2</div><div class="adm-cell adm-rate">B3</div><div class="adm-cell adm-rate">B4</div><div class="adm-cell adm-rate">B5</div><div class="adm-cell adm-rate">B6</div>
+        <div class="adm-cell adm-hd">C ค่อนข้าง</div>
+        <div class="adm-cell adm-rate">C1</div><div class="adm-cell adm-rate">C2</div><div class="adm-cell adm-rate">C3</div><div class="adm-cell adm-rate">C4</div><div class="adm-cell adm-rate">C5</div><div class="adm-cell adm-rate">C6</div>
+        <div class="adm-cell adm-hd">D ไม่ค่อย</div>
+        <div class="adm-cell adm-rate">D1</div><div class="adm-cell adm-rate">D2</div><div class="adm-cell adm-rate">D3</div><div class="adm-cell adm-rate">D4</div><div class="adm-cell adm-rate">D5</div><div class="adm-cell adm-rate">D6</div>
+        <div class="adm-cell adm-hd">E ไม่น่าเชื่อ</div>
+        <div class="adm-cell adm-rate">E1</div><div class="adm-cell adm-rate">E2</div><div class="adm-cell adm-rate">E3</div><div class="adm-cell adm-rate">E4</div><div class="adm-cell adm-rate">E5</div><div class="adm-cell adm-rate">E6</div>
+        <div class="adm-cell adm-hd">F ประเมินไม่ได้</div>
+        <div class="adm-cell adm-rate">F1</div><div class="adm-cell adm-rate">F2</div><div class="adm-cell adm-rate">F3</div><div class="adm-cell adm-rate">F4</div><div class="adm-cell adm-rate">F5</div><div class="adm-cell adm-rate">F6</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>SOURCE RATINGS — ปรับตามประวัติ</span></div>
+    <div class="src-rel">
+      <div class="rel-badge" style="background:var(--gn-d);color:var(--gn)">A1</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:500">e-GP / gprocurement.go.th</div><div style="font-size:10px;color:var(--t3);font-family:var(--mono)">ราชการ · ยืนยันถูกต้อง 47/47 ครั้ง</div></div>
+      <span class="status s-ok"><div class="s-dot"></div>highly reliable</span>
+    </div>
+    <div class="src-rel">
+      <div class="rel-badge" style="background:var(--gn-d);color:var(--gn)">B2</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:500">DBD / กรมพัฒนาธุรกิจการค้า</div><div style="font-size:10px;color:var(--t3);font-family:var(--mono)">ราชการ · ถูกต้อง 31/33 ครั้ง</div></div>
+      <span class="status s-ok"><div class="s-dot"></div>reliable</span>
+    </div>
+    <div class="src-rel">
+      <div class="rel-badge" style="background:var(--yw-d);color:var(--yw)">C3</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:500">Facebook UGC</div><div style="font-size:10px;color:var(--t3);font-family:var(--mono)">social · ถูกต้อง 12/19 ครั้ง · ต้อง verify</div></div>
+      <span class="status s-warn"><div class="s-dot"></div>fairly reliable</span>
+    </div>
+    <div class="src-rel">
+      <div class="rel-badge" style="background:var(--rd-d);color:var(--rd)">E5</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:500">Dark web forum (unverified)</div><div style="font-size:10px;color:var(--t3);font-family:var(--mono)">darkweb · ถูกต้อง 2/11 ครั้ง</div></div>
+      <span class="status s-err"><div class="s-dot"></div>unreliable</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 3. COLLABORATION ══ -->
+<div class="mod" id="m-collab">
+  <div class="mh">
+    <div class="mh-title">👥 Collaboration <span class="mh-num">Multi-Analyst · Module 3</span></div>
+    <div class="mh-sub">หลาย analyst ทำงานบนเคสเดียวกัน เห็นกิจกรรมของกัน comment บนหลักฐาน และบันทึกความเห็นต่างไว้โดยไม่บังคับให้เลือกข้างก่อนเวลา</div>
+  </div>
+  <div class="sc2">
+    <div class="card" style="margin-bottom:0">
+      <div class="ch"><span>ACTIVITY FEED — ABC Construction</span><span class="status s-ok"><div class="s-dot"></div>3 online</span></div>
+      <div class="activity"><div class="act-ava" style="background:var(--pu-d);color:var(--pu-s)">ส</div><div class="act-body"><div>สุเมธ เพิ่มหลักฐาน <strong>e-GP ประกาศผล</strong></div><div class="act-meta">2 นาทีที่แล้ว</div></div></div>
+      <div class="activity"><div class="act-ava" style="background:var(--ac-d);color:var(--ac)">ว</div><div class="act-body"><div>วิภา comment บน <strong>DBD กรรมการ</strong></div><div class="act-meta">8 นาทีที่แล้ว</div></div></div>
+      <div class="activity"><div class="act-ava" style="background:var(--gn-d);color:var(--gn)">ส</div><div class="act-body"><div>สมศักดิ์ verify <strong>Whois domain</strong> → partial</div><div class="act-meta">15 นาทีที่แล้ว</div></div></div>
+      <div class="activity"><div class="act-ava" style="background:var(--ac-d);color:var(--ac)">ว</div><div class="act-body"><div>วิภา บันทึก <strong>dissenting view</strong></div><div class="act-meta">22 นาทีที่แล้ว</div></div></div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="ch"><span>DISCUSSION — Whois evidence</span></div>
+      <div class="cb">
+        <div class="comment">
+          <div class="comment-head"><div class="act-ava" style="background:var(--pu-d);color:var(--pu-s);width:20px;height:20px;font-size:9px">ส</div><span style="font-size:11px;font-weight:500">สุเมธ</span><span style="font-size:9px;color:var(--t3);font-family:var(--mono)">15m</span></div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.5">domain ทั้งสองจด email เดียวกัน น่าจะเชื่อมโยงกัน</div>
+        </div>
+        <div class="dissent">
+          <div class="comment-head"><div class="act-ava" style="background:var(--ac-d);color:var(--ac);width:20px;height:20px;font-size:9px">ว</div><span style="font-size:11px;font-weight:500">วิภา</span><span class="tg" style="background:var(--yw-d);color:var(--yw);margin:0">DISSENT</span></div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.5">ไม่เห็นด้วย — email เดียวกันอาจเป็นบริษัทรับจดโดเมนเจ้าเดียวกัน ไม่ได้แปลว่าเจ้าของเดียวกัน ต้องดู registrant ตัวจริง</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 4. ANALYTIC CONFIDENCE ══ -->
+<div class="mod" id="m-confidence">
+  <div class="mh">
+    <div class="mh-title">📊 Analytic Confidence & Dissent <span class="mh-num">Module 4</span></div>
+    <div class="mh-sub">ทุกข้อสรุประบุระดับความมั่นใจ พร้อมบันทึกความเห็นแย้ง และรองรับ Analysis of Competing Hypotheses เพื่อลด confirmation bias</div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>BRIEF FINDINGS — ระดับความมั่นใจ</span></div>
+    <div class="conf-item">
+      <div class="conf-claim">ABC Construction ชนะประมูล 4 โครงการ รวม 2.8 พันล้าน</div>
+      <span class="conf-level" style="background:var(--gn-d);color:var(--gn)">●●● HIGH CONFIDENCE</span>
+      <span style="font-size:10px;color:var(--t3);margin-left:8px">e-GP ยืนยัน 3 แหล่ง · source A1</span>
+    </div>
+    <div class="conf-item">
+      <div class="conf-claim">กรรมการทั้งสองบริษัทเชื่อมโยงกัน</div>
+      <span class="conf-level" style="background:var(--yw-d);color:var(--yw)">●●○ MEDIUM CONFIDENCE</span>
+      <span style="font-size:10px;color:var(--t3);margin-left:8px">หลักฐานบ่งชี้แต่ยังไม่ยืนยัน · มี dissent</span>
+    </div>
+    <div class="conf-item">
+      <div class="conf-claim">มีการตั้งบริษัทเพื่อฮั้วประมูลโดยเจตนา</div>
+      <span class="conf-level" style="background:var(--rd-d);color:var(--rd)">●○○ LOW CONFIDENCE</span>
+      <span style="font-size:10px;color:var(--t3);margin-left:8px">สมมติฐาน · ยังขาดหลักฐานตรง</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>ANALYSIS OF COMPETING HYPOTHESES</span><span>ลด confirmation bias</span></div>
+    <div class="cb">
+      <table class="ach-table">
+        <thead><tr><th>หลักฐาน</th><th style="text-align:center">H1: ฮั้วประมูล</th><th style="text-align:center">H2: บังเอิญ</th><th style="text-align:center">H3: บริษัทใหม่เก่ง</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--t2)">ชนะ 4 โครงการพร้อมกัน</td><td style="text-align:center" class="ach-mark"><span style="color:var(--gn)">++</span></td><td style="text-align:center" class="ach-mark"><span style="color:var(--rd)">−−</span></td><td style="text-align:center" class="ach-mark"><span style="color:var(--yw)">+</span></td></tr>
+          <tr><td style="color:var(--t2)">บริษัทอายุ 3 ปี ทุน 1 ล้าน</td><td style="text-align:center" class="ach-mark"><span style="color:var(--gn)">+</span></td><td style="text-align:center" class="ach-mark"><span style="color:var(--t3)">0</span></td><td style="text-align:center" class="ach-mark"><span style="color:var(--rd)">−</span></td></tr>
+          <tr><td style="color:var(--t2)">กรรมการ email เดียวกัน</td><td style="text-align:center" class="ach-mark"><span style="color:var(--gn)">+</span></td><td style="text-align:center" class="ach-mark"><span style="color:var(--rd)">−</span></td><td style="text-align:center" class="ach-mark"><span style="color:var(--t3)">0</span></td></tr>
+          <tr style="background:var(--sf2)"><td style="font-weight:600">คะแนนรวม</td><td style="text-align:center;font-weight:600;color:var(--gn)">สอดคล้องสุด</td><td style="text-align:center;color:var(--rd)">ขัดแย้ง</td><td style="text-align:center;color:var(--yw)">เป็นไปได้</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:11px;color:var(--t3);margin-top:10px;line-height:1.6">ACH ชี้ว่า H1 สอดคล้องกับหลักฐานมากสุด แต่ยังตัด H3 ไม่ได้สมบูรณ์ — ต้องการหลักฐานเพิ่มเพื่อแยกสองสมมติฐานนี้</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 5. DECEPTION DETECTION ══ -->
+<div class="mod" id="m-deception">
+  <div class="mh">
+    <div class="mh-title">🎭 Deception Detection <span class="mh-num">Counter-Intelligence · Module 5</span></div>
+    <div class="mh-sub">ประเมินว่าข้อมูลอาจถูกปล่อยมาเพื่อหลอก ใครได้ประโยชน์ มาในจังหวะที่น่าสงสัยหรือไม่ และตรวจจับ bot network ในข้อมูลโซเชียล</div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>COUNTER-INTELLIGENCE CHECK — คลิปตำรวจภาคใต้</span></div>
+    <div class="cb">
+      <div class="decep-q"><span style="color:var(--pu-s)">▸</span><div><strong>ใครได้ประโยชน์</strong> ถ้าเรารายงานข่าวนี้? — คลิปปล่อยก่อนการแต่งตั้งโยกย้ายตำรวจ 2 สัปดาห์ อาจมีผู้ต้องการ discredit นายตำรวจคนนี้</div></div>
+      <div class="decep-q"><span style="color:var(--pu-s)">▸</span><div><strong>จังหวะเวลา</strong> น่าสงสัยไหม? — โพสต์พร้อมกัน 47 บัญชีภายใน 3 นาที ผิดธรรมชาติ</div></div>
+      <div class="decep-q"><span style="color:var(--pu-s)">▸</span><div><strong>แหล่งมีแรงจูงใจซ่อนเร้น</strong>? — บัญชีต้นทางเพิ่งสร้าง 1 เดือน โพสต์เฉพาะเรื่องนี้</div></div>
+      <div class="decep-flag">⚠ FLAGGED: รูปแบบบ่งชี้ว่าอาจเป็น coordinated disinformation — ตรวจสอบเพิ่มก่อนรายงาน</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>BOT NETWORK ANALYSIS</span></div>
+    <div class="cb">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:10px">การแพร่กระจายของคลิปนี้:</div>
+      <div class="bot-meter"><span style="font-size:11px;color:var(--t3);width:120px">Coordinated posting</span><div class="bot-bar"><div style="height:100%;width:84%;background:var(--rd);border-radius:3px"></div></div><span style="font-size:11px;font-family:var(--mono);color:var(--rd)">84%</span></div>
+      <div class="bot-meter"><span style="font-size:11px;color:var(--t3);width:120px">Account age (ใหม่)</span><div class="bot-bar"><div style="height:100%;width:71%;background:var(--yw);border-radius:3px"></div></div><span style="font-size:11px;font-family:var(--mono);color:var(--yw)">71%</span></div>
+      <div class="bot-meter"><span style="font-size:11px;color:var(--t3);width:120px">Text similarity</span><div class="bot-bar"><div style="height:100%;width:92%;background:var(--rd);border-radius:3px"></div></div><span style="font-size:11px;font-family:var(--mono);color:var(--rd)">92%</span></div>
+      <div style="font-size:11px;color:var(--rd);margin-top:10px;line-height:1.6">⚠ ความน่าจะเป็น bot network สูง (82%) — ข้อความเกือบเหมือนกัน บัญชีใหม่ โพสต์พร้อมกัน</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 6. KNOWLEDGE BASE ══ -->
+<div class="mod" id="m-knowledge">
+  <div class="mh">
+    <div class="mh-title">🧠 Knowledge Base <span class="mh-num">Institutional Memory · Module 6</span></div>
+    <div class="mh-sub">เคสที่ปิดแล้วกลายเป็นความรู้ที่ค้นได้ — เอนทิตีทุกตัวมีประวัติข้ามเคส และระบบตรวจจับรูปแบบที่ปรากฏซ้ำ</div>
+  </div>
+  <div class="kb-search">
+    <input class="kb-inp" placeholder='ค้นข้ามทุกเคส เช่น "ประมูลภาครัฐ" หรือ "นายสมชาย"' value="นายสมชาย ใจดี"/>
+    <button class="btn-p">ค้นหา</button>
+  </div>
+  <div class="pattern-alert">
+    <span style="font-size:18px">🔍</span>
+    <div><strong style="color:var(--pu-s)">Cross-Case Pattern พบ:</strong> นายสมชาย ใจดี ปรากฏใน 3 เคสที่เกี่ยวกับการประมูลภาครัฐในรอบ 18 เดือน — รูปแบบการตั้งบริษัทใหม่ก่อนประมูลซ้ำกัน 2 ครั้ง</div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>ENTITY HISTORY — นายสมชาย ใจดี</span></div>
+    <div class="entity-history">
+      <div class="eh-name">👤 นายสมชาย ใจดี <span class="tg" style="background:var(--rd-d);color:var(--rd)">3 เคส</span></div>
+      <div style="font-size:11px;color:var(--t2)">กรรมการบริษัทรับเหมา · ปรากฏครั้งแรก ม.ค. 2567</div>
+      <div class="eh-cases">
+        <div class="eh-case"><span class="vd" style="background:var(--rd-d);color:var(--rd)">ACTIVE</span><span style="flex:1">ABC Construction — ประมูลทางหลวง 2.8 พันล้าน</span><span style="color:var(--t3);font-family:var(--mono)">มิ.ย. 68</span></div>
+        <div class="eh-case"><span class="vd" style="background:var(--t3);color:var(--bg)">CLOSED</span><span style="flex:1">XYZ Holdings — ประมูลอาคารราชการ</span><span style="color:var(--t3);font-family:var(--mono)">ต.ค. 67</span></div>
+        <div class="eh-case"><span class="vd" style="background:var(--t3);color:var(--bg)">CLOSED</span><span style="flex:1">เครือข่ายรับเหมาภาคอีสาน</span><span style="color:var(--t3);font-family:var(--mono)">ม.ค. 67</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>DETECTED PATTERNS — ข้ามเคส</span></div>
+    <div class="cb" style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--t2);line-height:1.6"><span style="color:var(--yw)">▸</span>บริษัทอายุน้อย ทุนจดทะเบียนต่ำ ชนะประมูลมูลค่าสูง — พบ 4 ครั้งใน 3 เคส</div>
+      <div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--t2);line-height:1.6"><span style="color:var(--yw)">▸</span>กรรมการชุดเดียวกันหมุนเวียนตั้งบริษัทใหม่ — พบ 2 ครั้ง</div>
+      <div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--t2);line-height:1.6"><span style="color:var(--yw)">▸</span>domain จด email เดียวกันกับบริษัทคู่แข่งในประมูล — พบ 2 ครั้ง</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<script>
+function gm(id, el){
+  document.querySelectorAll('.mod').forEach(m=>m.classList.remove('on'));
+  document.getElementById('m-'+id).classList.add('on');
+  document.querySelectorAll('.si').forEach(i=>i.classList.remove('on'));
+  if(el) el.classList.add('on');
+  document.querySelector('.content').scrollTop=0;
+}
+document.querySelectorAll('.adm-rate').forEach(c=>{
+  c.onclick=()=>{document.querySelectorAll('.adm-rate').forEach(x=>x.classList.remove('sel'));c.classList.add('sel')};
+});
+</script>
+</body>
+</html>

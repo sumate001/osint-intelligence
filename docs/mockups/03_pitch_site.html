@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OSINT//DESK — Intelligence Platform for Modern Newsrooms</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0B0E14;
+  --ink2:#12161F;
+  --paper:#F2EEE4;
+  --paper2:#E8E2D4;
+  --line:#1C212E;
+  --line2:#2A3142;
+  --fog:#8A93A6;
+  --fog2:#5A6276;
+  --signal:#D4FF4F;      /* signature — acid lime, ใช้น้อยมาก */
+  --signal-dim:#9DB838;
+  --amber:#E8A33D;
+  --crimson:#D4503E;
+  --jade:#3DAE7C;
+  --azure:#5B8DEF;
+  --thai:'Noto Sans Thai',sans-serif;
+  --display:'Space Grotesk',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+}
+html{scroll-behavior:smooth}
+body{background:var(--ink);color:var(--paper);font-family:var(--thai);font-size:15px;line-height:1.7;overflow-x:hidden}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(11,14,20,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 32px;z-index:100}
+.nav-logo{font-family:var(--mono);font-size:14px;font-weight:500;letter-spacing:.08em;display:flex;align-items:center;gap:9px}
+.nav-dot{width:9px;height:9px;border-radius:50%;background:var(--signal);box-shadow:0 0 12px var(--signal)}
+.nav-links{margin-left:auto;display:flex;gap:28px;align-items:center}
+.nav-links a{color:var(--fog);text-decoration:none;font-size:13px;font-family:var(--mono);transition:color .2s}
+.nav-links a:hover{color:var(--paper)}
+.nav-cta{background:var(--signal);color:var(--ink);padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;font-family:var(--display)}
+
+/* ── HERO ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:120px 32px 80px;max-width:1200px;margin:0 auto;position:relative}
+.hero-eyebrow{font-family:var(--mono);font-size:13px;color:var(--signal-dim);letter-spacing:.12em;margin-bottom:24px;display:flex;align-items:center;gap:10px}
+.hero-eyebrow::before{content:'';width:40px;height:1px;background:var(--signal-dim)}
+.hero h1{font-family:var(--display);font-size:clamp(40px,7vw,84px);font-weight:700;line-height:1.02;letter-spacing:-.02em;margin-bottom:28px;max-width:18ch}
+.hero h1 .em{color:var(--signal);font-style:italic;font-weight:600}
+.hero-sub{font-size:clamp(16px,2vw,21px);color:var(--fog);max-width:54ch;line-height:1.6;margin-bottom:40px}
+.hero-actions{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.btn-signal{background:var(--signal);color:var(--ink);padding:14px 28px;border-radius:8px;font-size:15px;font-weight:600;font-family:var(--display);text-decoration:none;transition:transform .15s,box-shadow .15s;display:inline-block}
+.btn-signal:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(212,255,79,.25)}
+.btn-ghost{border:1px solid var(--line2);color:var(--paper);padding:14px 28px;border-radius:8px;font-size:15px;font-family:var(--mono);text-decoration:none;transition:border-color .2s}
+.btn-ghost:hover{border-color:var(--fog)}
+
+/* hero stat strip */
+.hero-strip{display:flex;gap:0;margin-top:64px;border-top:1px solid var(--line);padding-top:32px}
+.hs{flex:1;padding-right:24px}
+.hs-num{font-family:var(--mono);font-size:32px;font-weight:500;color:var(--paper);line-height:1}
+.hs-num .unit{font-size:18px;color:var(--signal-dim)}
+.hs-lbl{font-size:13px;color:var(--fog);margin-top:6px}
+
+/* ── SECTION ── */
+section{padding:96px 32px;max-width:1200px;margin:0 auto}
+.sec-eyebrow{font-family:var(--mono);font-size:12px;color:var(--signal-dim);letter-spacing:.14em;margin-bottom:16px}
+.sec-title{font-family:var(--display);font-size:clamp(28px,4vw,46px);font-weight:600;line-height:1.1;letter-spacing:-.01em;margin-bottom:20px;max-width:20ch}
+.sec-intro{font-size:17px;color:var(--fog);max-width:60ch;margin-bottom:56px}
+
+/* ── PROBLEM ── */
+.prob-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.prob{background:var(--ink2);padding:32px;transition:background .2s}
+.prob:hover{background:var(--ink)}
+.prob-n{font-family:var(--mono);font-size:13px;color:var(--crimson);margin-bottom:14px}
+.prob-h{font-family:var(--display);font-size:20px;font-weight:600;margin-bottom:10px}
+.prob-d{font-size:14px;color:var(--fog);line-height:1.65}
+
+/* ── TWO LAYER ── */
+.layers{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:40px}
+.layer{border:1px solid var(--line2);border-radius:16px;padding:32px;position:relative;overflow:hidden}
+.layer.auto{background:linear-gradient(160deg,rgba(61,174,124,.06),transparent)}
+.layer.user{background:linear-gradient(160deg,rgba(91,141,239,.06),transparent)}
+.layer-tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;padding:4px 10px;border-radius:5px;display:inline-block;margin-bottom:18px}
+.layer.auto .layer-tag{background:rgba(61,174,124,.15);color:var(--jade)}
+.layer.user .layer-tag{background:rgba(91,141,239,.15);color:var(--azure)}
+.layer h3{font-family:var(--display);font-size:24px;font-weight:600;margin-bottom:12px}
+.layer-d{font-size:14px;color:var(--fog);margin-bottom:24px;line-height:1.65}
+.layer-list{list-style:none;display:flex;flex-direction:column;gap:12px}
+.layer-list li{display:flex;gap:11px;align-items:flex-start;font-size:14px;color:var(--paper)}
+.layer-list .dot{width:6px;height:6px;border-radius:50%;margin-top:8px;flex-shrink:0}
+.layer.auto .dot{background:var(--jade)}
+.layer.user .dot{background:var(--azure)}
+
+/* ── FEATURES ── */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.feat{border:1px solid var(--line);border-radius:14px;padding:28px;background:var(--ink2);transition:transform .2s,border-color .2s}
+.feat:hover{transform:translateY(-3px);border-color:var(--line2)}
+.feat-ico{font-size:28px;margin-bottom:16px;display:block}
+.feat-h{font-family:var(--display);font-size:18px;font-weight:600;margin-bottom:10px}
+.feat-d{font-size:14px;color:var(--fog);line-height:1.6}
+
+/* ── ARCHITECTURE ── */
+.arch{background:var(--ink2);border:1px solid var(--line);border-radius:16px;padding:40px;margin-top:40px}
+.arch-layer{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.arch-label{font-family:var(--mono);font-size:11px;color:var(--fog2);width:90px;flex-shrink:0;text-align:right;letter-spacing:.05em}
+.arch-boxes{flex:1;display:flex;gap:8px;flex-wrap:wrap}
+.arch-box{background:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--paper);flex:1;text-align:center;min-width:90px}
+.arch-box.hl{border-color:var(--signal-dim);color:var(--signal)}
+.arch-flow{text-align:center;color:var(--fog2);font-size:16px;margin:4px 0}
+
+/* ── PRICING ── */
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.price{border:1px solid var(--line2);border-radius:16px;padding:32px;background:var(--ink2);position:relative}
+.price.featured{border-color:var(--signal);background:linear-gradient(160deg,rgba(212,255,79,.05),transparent)}
+.price-badge{position:absolute;top:-11px;left:32px;background:var(--signal);color:var(--ink);font-size:11px;font-weight:600;font-family:var(--mono);padding:3px 12px;border-radius:5px}
+.price-tier{font-family:var(--mono);font-size:13px;color:var(--fog);letter-spacing:.08em;margin-bottom:8px}
+.price-name{font-family:var(--display);font-size:24px;font-weight:600;margin-bottom:16px}
+.price-desc{font-size:13px;color:var(--fog);margin-bottom:24px;line-height:1.6;min-height:60px}
+.price-feats{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
+.price-feats li{display:flex;gap:9px;align-items:flex-start;font-size:14px;color:var(--paper)}
+.price-feats .chk{color:var(--jade);flex-shrink:0}
+.price-cta{display:block;text-align:center;padding:12px;border-radius:8px;font-size:14px;font-weight:500;text-decoration:none;font-family:var(--display);transition:all .2s}
+.price .price-cta{border:1px solid var(--line2);color:var(--paper)}
+.price .price-cta:hover{border-color:var(--fog)}
+.price.featured .price-cta{background:var(--signal);color:var(--ink);font-weight:600}
+
+/* ── CTA ── */
+.cta-band{background:linear-gradient(135deg,var(--ink2),var(--ink));border:1px solid var(--line2);border-radius:20px;padding:64px 48px;text-align:center;margin:96px auto;max-width:1000px}
+.cta-band h2{font-family:var(--display);font-size:clamp(28px,4vw,42px);font-weight:600;margin-bottom:16px;line-height:1.1}
+.cta-band p{font-size:17px;color:var(--fog);max-width:50ch;margin:0 auto 32px}
+
+/* ── FOOTER ── */
+footer{border-top:1px solid var(--line);padding:48px 32px;max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px}
+.foot-logo{font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:var(--fog)}
+.foot-note{font-size:12px;color:var(--fog2);font-family:var(--mono)}
+
+@media(max-width:880px){
+  .prob-grid,.layers,.feat-grid,.price-grid{grid-template-columns:1fr}
+  .hero-strip{flex-wrap:wrap;gap:24px}
+  .hs{flex:1 1 40%}
+  .nav-links a:not(.nav-cta){display:none}
+  .arch-label{width:auto;text-align:left}
+  .arch-layer{flex-direction:column;align-items:stretch}
+}
+/* reveal */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo"><div class="nav-dot"></div>OSINT//DESK</div>
+  <div class="nav-links">
+    <a href="#problem">ปัญหา</a>
+    <a href="#how">วิธีทำงาน</a>
+    <a href="#features">ความสามารถ</a>
+    <a href="#arch">สถาปัตยกรรม</a>
+    <a href="#pricing">ราคา</a>
+    <a href="#contact" class="nav-cta">ขอ Demo</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">INTELLIGENCE PLATFORM · OPEN SOURCE · SELF-HOSTED</div>
+  <h1>ห้องข่าวที่<span class="em">รู้ก่อน</span> ตรวจสอบได้ และนำเสนออย่างมีหลักฐาน</h1>
+  <p class="hero-sub">OSINT//DESK เปลี่ยนห้องข่าวจากผู้รับข่าวมารายงาน เป็นหน่วยข่าวกรองที่คัดกรองข่าวอัตโนมัติ สืบสวนเชิงลึก และตรวจสอบข้อเท็จจริงด้วยเครื่องมือระดับ Bellingcat — ทำงานบนเซิร์ฟเวอร์ของคุณเอง ไม่มีค่าลิขสิทธิ์รายปี</p>
+  <div class="hero-actions">
+    <a href="#contact" class="btn-signal">ขอชมการสาธิต</a>
+    <a href="#how" class="btn-ghost">ดูวิธีทำงาน →</a>
+  </div>
+  <div class="hero-strip">
+    <div class="hs"><div class="hs-num">24<span class="unit">/7</span></div><div class="hs-lbl">คัดกรองข่าวอัตโนมัติ ไม่ต้องมีคนเฝ้า</div></div>
+    <div class="hs"><div class="hs-num">100<span class="unit">%</span></div><div class="hs-lbl">ข้อมูลอยู่ในเซิร์ฟเวอร์ของคุณ</div></div>
+    <div class="hs"><div class="hs-num">0<span class="unit">฿</span></div><div class="hs-lbl">ค่าลิขสิทธิ์ซอฟต์แวร์ต่อผู้ใช้</div></div>
+    <div class="hs"><div class="hs-num">8<span class="unit">wk</span></div><div class="hs-lbl">ติดตั้งครบพร้อมใช้งานจริง</div></div>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <div class="reveal">
+    <div class="sec-eyebrow">ปัญหาของห้องข่าวยุคใหม่</div>
+    <div class="sec-title">ข้อมูลท่วมท้น แต่ข่าวสำคัญหลุดรอด</div>
+    <p class="sec-intro">ห้องข่าวสมัยใหม่เผชิญจุดอ่อนเชิงโครงสร้างที่เครื่องมือเดิมแก้ไม่ได้</p>
+  </div>
+  <div class="prob-grid reveal">
+    <div class="prob">
+      <div class="prob-n">01</div>
+      <div class="prob-h">ข้อมูลท่วมท้น</div>
+      <div class="prob-d">นักข่าวต้องติดตามแหล่งข่าวหลายร้อยช่องทาง ไม่มีทางอ่านหมดทุกวัน ข่าวสำคัญถูกฝังใต้ข่าวธรรมดาเป็นประจำ</div>
+    </div>
+    <div class="prob">
+      <div class="prob-n">02</div>
+      <div class="prob-h">ตรวจสอบช้าจนพลาดจังหวะ</div>
+      <div class="prob-d">การยืนยันว่าคลิปจริงหรือปลอม ถ่ายที่ไหนเมื่อไหร่ ใช้เครื่องมือหลายตัวและความเชี่ยวชาญเฉพาะ กว่าจะเสร็จก็พลาดข่าว</div>
+    </div>
+    <div class="prob">
+      <div class="prob-n">03</div>
+      <div class="prob-h">เครื่องมือแพงและผูกขาด</div>
+      <div class="prob-d">ซอฟต์แวร์สืบสวนระดับมืออาชีพมีค่าลิขสิทธิ์หลายหมื่นต่อปีต่อคน และข้อมูลอ่อนไหวต้องส่งผ่านเซิร์ฟเวอร์ต่างประเทศ</div>
+    </div>
+    <div class="prob">
+      <div class="prob-n">04</div>
+      <div class="prob-h">ความเสี่ยงทางกฎหมาย</div>
+      <div class="prob-d">การนำเสนอข่าวเชิงลึกโดยไม่มีหลักฐานครบถ้วนตรวจสอบได้ เปิดช่องให้ถูกฟ้องหมิ่นประมาทได้ง่าย</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW: TWO LAYERS -->
+<section id="how">
+  <div class="reveal">
+    <div class="sec-eyebrow">วิธีทำงาน</div>
+    <div class="sec-title">สองชั้นที่แยกกันชัดเจน</div>
+    <p class="sec-intro">ระบบอัตโนมัติทำงานหนักเบื้องหลัง ส่วนนักข่าวเห็นเฉพาะสิ่งที่ต้องตัดสินใจ ไม่ซับซ้อน ไม่ต้องเรียนรู้นาน</p>
+  </div>
+  <div class="layers reveal">
+    <div class="layer auto">
+      <span class="layer-tag">ทำงานเบื้องหลัง 24/7</span>
+      <h3>ระบบอัตโนมัติ</h3>
+      <p class="layer-d">ดูดข้อมูล ให้คะแนน เฝ้าระวัง และตรวจจับรูปแบบ ทั้งหมดไม่ต้องมีคนสั่งงาน</p>
+      <ul class="layer-list">
+        <li><span class="dot"></span>ดูดข่าวจาก RSS, GDELT, ACLED ทุก 5 นาที</li>
+        <li><span class="dot"></span>AI ให้คะแนนทุกข่าวตามเกณฑ์ 7 ด้าน</li>
+        <li><span class="dot"></span>เฝ้าระวังประเด็นที่กำลังก่อตัวเป็นข่าว</li>
+        <li><span class="dot"></span>สแกนรายการติดตามแล้วแจ้งเตือนอัตโนมัติ</li>
+      </ul>
+    </div>
+    <div class="layer user">
+      <span class="layer-tag">นักข่าวใช้งานจริง</span>
+      <h3>พื้นที่ทำงาน 4 หน้า</h3>
+      <p class="layer-d">เปิดมาเห็นข่าวสำคัญทันที คลิกเดียวเข้าสู่การสืบสวน เรียบง่ายแต่ทรงพลัง</p>
+      <ul class="layer-list">
+        <li><span class="dot"></span>หน้าแรก: ข่าว Priority พร้อมปุ่มลงมือทันที</li>
+        <li><span class="dot"></span>สืบสวน: แผนที่ความสัมพันธ์ + ผู้ช่วยวิจัย AI</li>
+        <li><span class="dot"></span>ตรวจสอบสื่อ: อัปโหลดแล้วรู้ผลทันที</li>
+        <li><span class="dot"></span>เขียนรายงาน: สองชั้น ภายในและสาธารณะ</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="reveal">
+    <div class="sec-eyebrow">ความสามารถ</div>
+    <div class="sec-title">เครื่องมือระดับหน่วยข่าวกรอง ในมือนักข่าวทุกคน</div>
+  </div>
+  <div class="feat-grid reveal">
+    <div class="feat">
+      <span class="feat-ico">🎯</span>
+      <div class="feat-h">คัดกรองข่าวอัจฉริยะ</div>
+      <div class="feat-d">AI ให้คะแนนทุกข่าวตามเกณฑ์ที่ห้องข่าวกำหนด จัดระดับเป็น 4 กลุ่ม แจ้งเตือนเฉพาะเรื่องสำคัญ</div>
+    </div>
+    <div class="feat">
+      <span class="feat-ico">🌐</span>
+      <div class="feat-h">เฝ้าระวังสภาพแวดล้อม</div>
+      <div class="feat-d">เฝ้าดูภาพรวมของประเด็นที่สนใจ ตรวจจับสัญญาณก่อนกลายเป็นข่าวใหญ่ ทำให้รู้ก่อนคู่แข่ง</div>
+    </div>
+    <div class="feat">
+      <span class="feat-ico">🕸</span>
+      <div class="feat-h">แผนที่ความสัมพันธ์</div>
+      <div class="feat-d">ทำแผนที่ความเชื่อมโยงระหว่างบุคคล องค์กร และข้อมูลโดยอัตโนมัติ หาความสัมพันธ์ที่ซ่อนอยู่</div>
+    </div>
+    <div class="feat">
+      <span class="feat-ico">🛡</span>
+      <div class="feat-h">ตรวจสอบสื่อ</div>
+      <div class="feat-d">อัปโหลดภาพหรือวิดีโอ รู้ทันทีว่าถ่ายที่ไหน เมื่อไหร่ เคยเผยแพร่มาก่อนหรือไม่ ลดความเสี่ยงออกอากาศข้อมูลปลอม</div>
+    </div>
+    <div class="feat">
+      <span class="feat-ico">🔎</span>
+      <div class="feat-h">ผู้ช่วยวิจัย AI</div>
+      <div class="feat-d">ค้นหาข้อมูลเชิงลึกแบบถาม-ตอบ ได้คำตอบพร้อมแหล่งอ้างอิงครบ ผ่านเสิร์ชเอนจินที่ไม่ถูกติดตาม</div>
+    </div>
+    <div class="feat">
+      <span class="feat-ico">📋</span>
+      <div class="feat-h">รายงานสองชั้น</div>
+      <div class="feat-d">สร้างรายงานภายในที่มีข้อมูลครบ และรายงานสาธารณะที่มีเฉพาะข้อมูลยืนยันแล้วพร้อมระเบียบวิธี</div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="arch">
+  <div class="reveal">
+    <div class="sec-eyebrow">สถาปัตยกรรม</div>
+    <div class="sec-title">โอเพนซอร์สทั้งหมด ไม่ผูกขาด</div>
+    <p class="sec-intro">ทุกองค์ประกอบเป็นซอฟต์แวร์โอเพนซอร์สชั้นนำ ทำงานบนเซิร์ฟเวอร์เดียวด้วย Docker</p>
+  </div>
+  <div class="arch reveal">
+    <div class="arch-layer">
+      <div class="arch-label">FRONTEND</div>
+      <div class="arch-boxes"><div class="arch-box">Next.js + React</div><div class="arch-box">Tailwind</div><div class="arch-box">vis.js graph</div></div>
+    </div>
+    <div class="arch-flow">↓</div>
+    <div class="arch-layer">
+      <div class="arch-label">API</div>
+      <div class="arch-boxes"><div class="arch-box">FastAPI</div><div class="arch-box">Celery + Redis</div><div class="arch-box">JWT auth</div></div>
+    </div>
+    <div class="arch-flow">↓</div>
+    <div class="arch-layer">
+      <div class="arch-label">SEARCH + AI</div>
+      <div class="arch-boxes"><div class="arch-box hl">SearXNG</div><div class="arch-box hl">Perplexica</div><div class="arch-box hl">Ollama · qwen3</div><div class="arch-box">SpiderFoot</div></div>
+    </div>
+    <div class="arch-flow">↓</div>
+    <div class="arch-layer">
+      <div class="arch-label">DATA</div>
+      <div class="arch-boxes"><div class="arch-box">PostgreSQL</div><div class="arch-box">Neo4j graph</div><div class="arch-box">Meilisearch</div><div class="arch-box">MinIO</div></div>
+    </div>
+    <div class="arch-flow">↓</div>
+    <div class="arch-layer">
+      <div class="arch-label">OPS</div>
+      <div class="arch-boxes"><div class="arch-box">n8n automation</div><div class="arch-box">Grafana</div><div class="arch-box">Docker Compose</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="reveal">
+    <div class="sec-eyebrow">รูปแบบบริการ</div>
+    <div class="sec-title">จ่ายครั้งเดียว เป็นเจ้าของจริง</div>
+    <p class="sec-intro">ไม่มีค่าลิขสิทธิ์ต่อผู้ใช้ ค่าบริการคือค่าติดตั้ง ดูแลรักษา และพัฒนาเฉพาะ ทำให้วางแผนงบประมาณได้แน่นอน</p>
+  </div>
+  <div class="price-grid reveal">
+    <div class="price">
+      <div class="price-tier">STARTER</div>
+      <div class="price-name">ระดับเริ่มต้น</div>
+      <div class="price-desc">ห้องข่าวขนาดเล็กถึงกลาง ติดตั้งเซิร์ฟเวอร์เดียว ผู้ใช้พร้อมกันถึง 10 คน</div>
+      <ul class="price-feats">
+        <li><span class="chk">✓</span>คัดกรองข่าวอัตโนมัติ</li>
+        <li><span class="chk">✓</span>ตรวจสอบสื่อครบถ้วน</li>
+        <li><span class="chk">✓</span>ติดตั้งใน 4 สัปดาห์</li>
+        <li><span class="chk">✓</span>สนับสนุนทางอีเมล</li>
+      </ul>
+      <a href="#contact" class="price-cta">ปรึกษาราคา</a>
+    </div>
+    <div class="price featured">
+      <div class="price-badge">แนะนำ</div>
+      <div class="price-tier">PROFESSIONAL</div>
+      <div class="price-name">ระดับมืออาชีพ</div>
+      <div class="price-desc">ห้องข่าวขนาดใหญ่ ผู้ใช้ไม่จำกัด ครบทุกโมดูลรวมสืบสวนเชิงลึก</div>
+      <ul class="price-feats">
+        <li><span class="chk">✓</span>ทุกอย่างในระดับเริ่มต้น</li>
+        <li><span class="chk">✓</span>สืบสวนเชิงลึก + เฝ้าระวัง</li>
+        <li><span class="chk">✓</span>ปรับแต่งเกณฑ์ตามบรรณาธิการ</li>
+        <li><span class="chk">✓</span>สนับสนุนเร่งด่วน</li>
+      </ul>
+      <a href="#contact" class="price-cta">ปรึกษาราคา</a>
+    </div>
+    <div class="price">
+      <div class="price-tier">ENTERPRISE</div>
+      <div class="price-name">ระดับองค์กร</div>
+      <div class="price-desc">เชื่อมต่อระบบเดิม ฝึกอบรมทีมงาน และสนับสนุนเฉพาะทางเต็มรูปแบบ</div>
+      <ul class="price-feats">
+        <li><span class="chk">✓</span>ทุกอย่างในระดับมืออาชีพ</li>
+        <li><span class="chk">✓</span>เชื่อมต่อระบบที่มีอยู่</li>
+        <li><span class="chk">✓</span>ฝึกอบรมในองค์กร</li>
+        <li><span class="chk">✓</span>ทีมสนับสนุนเฉพาะ</li>
+      </ul>
+      <a href="#contact" class="price-cta">ปรึกษาราคา</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-band reveal" id="contact">
+  <h2>พร้อมยกระดับห้องข่าวของคุณ?</h2>
+  <p>ขอชมการสาธิตระบบจริง พร้อมประเมินความต้องการเฉพาะของห้องข่าวคุณ โดยไม่มีข้อผูกมัด</p>
+  <a href="mailto:hello@osintdesk.io" class="btn-signal">ขอชมการสาธิต →</a>
+</div>
+
+<footer>
+  <div>
+    <div class="foot-logo">OSINT//DESK</div>
+    <div class="foot-note" style="margin-top:6px">Intelligence platform for modern newsrooms</div>
+  </div>
+  <div class="foot-note">Open source · Self-hosted · Privacy-first</div>
+</footer>
+
+<script>
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')})},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

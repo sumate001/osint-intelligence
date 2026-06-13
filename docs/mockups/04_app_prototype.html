@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>OSINT//DESK — User</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* neutral dark — ไม่จัดจ้าน */
+  --bg:#0D0F14;
+  --sf:#13161D;
+  --sf2:#191D26;
+  --sf3:#1F2330;
+  --bd:#232838;
+  --bd2:#2C3347;
+  --t:#C9D1E0;     /* text หลัก — ไม่ขาวจัด */
+  --t2:#7A869A;    /* text รอง */
+  --t3:#445068;    /* text จาง */
+  /* accent — desaturated */
+  --ac:#4B7BEC;    /* น้ำเงินหม่น */
+  --ac-d:#1A2B4A;
+  --ac-t:#4B7BEC22;
+  /* status — ใช้ hue แต่ลด brightness */
+  --rd:#C0392B;    --rd-d:#2A1010;  --rd-t:#C0392B18;
+  --yw:#B7860D;    --yw-d:#2A1F08;  --yw-t:#B7860D18;
+  --gn:#1E8449;    --gn-d:#0D2318;  --gn-t:#1E844918;
+  --pu:#6C3483;    --pu-d:#1F1030;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Inter',sans-serif;
+}
+body{background:var(--bg);color:var(--t);font-family:var(--sans);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── TOPBAR ── */
+.tb{height:42px;border-bottom:1px solid var(--bd);background:var(--sf);display:flex;align-items:center;padding:0;flex-shrink:0}
+.tb-logo{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.05em;display:flex;align-items:center;gap:7px;padding:0 16px;border-right:1px solid var(--bd);height:100%;color:var(--t)}
+.tb-dot{width:7px;height:7px;border-radius:50%;background:var(--ac);flex-shrink:0}
+.tb-badge{font-size:9px;padding:1px 5px;border-radius:3px;background:var(--ac-d);color:var(--ac)}
+.tb-nav{display:flex;height:100%}
+.tn{display:flex;align-items:center;gap:6px;padding:0 14px;font-size:12px;cursor:pointer;color:var(--t2);position:relative;transition:color .15s;user-select:none;border-right:1px solid var(--bd)}
+.tn:hover{color:var(--t);background:var(--sf2)}
+.tn.on{color:var(--t)}
+.tn.on::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--ac)}
+.tn-ct{font-size:9px;font-family:var(--mono);padding:1px 5px;border-radius:8px;background:var(--sf3)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px;padding:0 14px}
+.live{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--gn);font-family:var(--mono)}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--gn);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.admin-btn{font-size:10px;color:var(--t3);font-family:var(--mono);cursor:pointer;padding:4px 9px;border:1px solid var(--bd2);border-radius:4px;transition:all .15s}
+.admin-btn:hover{color:var(--t2);border-color:var(--bd)}
+.ava{width:26px;height:26px;border-radius:50%;background:var(--ac-d);border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ac);font-weight:600}
+
+/* ── LAYOUT ── */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.mod{display:none;flex:1;overflow:hidden;flex-direction:column}
+.mod.on{display:flex}
+.pg{flex:1;overflow-y:auto;padding:14px 20px}
+.pg::-webkit-scrollbar{width:4px}
+.pg::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+
+/* ── PAGE HEADER ── */
+.ph{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
+.ph-title{font-size:15px;font-weight:600;color:var(--t)}
+.ph-meta{font-size:11px;color:var(--t3);font-family:var(--mono)}
+
+/* ── STATUS BAR (compact) ── */
+.status-bar{display:flex;gap:0;margin-bottom:14px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.sb-item{flex:1;padding:10px 14px;border-right:1px solid var(--bd);display:flex;align-items:center;gap:10px}
+.sb-item:last-child{border-right:none}
+.sb-num{font-size:18px;font-weight:600;font-family:var(--mono);line-height:1}
+.sb-lbl{font-size:10px;color:var(--t3);margin-top:1px}
+
+/* ── SECTION HEADER ── */
+.sec-hd{display:flex;align-items:center;gap:6px;margin:14px 0 8px;font-size:10px;font-weight:600;font-family:var(--mono);letter-spacing:.08em;color:var(--t3)}
+.sec-hd::after{content:'';flex:1;height:1px;background:var(--bd);margin-left:8px}
+
+/* ── ALERT ROW (compact) ── */
+.ar{display:flex;align-items:flex-start;gap:0;background:var(--sf);border:1px solid var(--bd);border-radius:8px;margin-bottom:6px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.ar:hover{border-color:var(--bd2)}
+.ar.rd{border-left:3px solid var(--rd)}
+.ar.yw{border-left:3px solid var(--yw)}
+.ar-body{flex:1;padding:10px 12px;min-width:0}
+.ar-meta{display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap}
+.ar-title{font-size:13px;font-weight:500;line-height:1.4;color:var(--t);margin-bottom:4px}
+.ar-sum{font-size:11px;color:var(--t2);line-height:1.6;padding:6px 8px;background:var(--sf2);border-radius:5px;margin-bottom:5px}
+.ar-tags{display:flex;gap:4px;flex-wrap:wrap}
+.ar-actions{display:flex;flex-direction:column;gap:4px;padding:10px 12px;flex-shrink:0;justify-content:center;border-left:1px solid var(--bd);min-width:110px;background:var(--sf2)}
+.vd{font-size:9px;padding:2px 6px;border-radius:3px;font-family:var(--mono);font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
+.vd-r{background:var(--rd-d);color:var(--rd)}
+.vd-y{background:var(--yw-d);color:var(--yw)}
+.vd-b{background:var(--ac-d);color:var(--ac)}
+.vd-g{background:var(--gn-d);color:var(--gn)}
+.tg{font-size:10px;padding:1px 6px;border-radius:3px;font-family:var(--mono);display:inline-block}
+.score-text{font-size:10px;color:var(--t3);font-family:var(--mono)}
+
+/* ── BUTTONS ── */
+.btn-p{padding:6px 12px;border-radius:5px;background:var(--ac);color:#fff;border:none;font-size:11px;font-weight:500;cursor:pointer;font-family:var(--sans);width:100%;transition:opacity .15s;text-align:center}
+.btn-p:hover{opacity:.85}
+.btn-s{padding:5px 12px;border-radius:5px;background:transparent;color:var(--t2);border:1px solid var(--bd2);font-size:11px;cursor:pointer;font-family:var(--sans);width:100%;transition:all .15s;text-align:center}
+.btn-s:hover{border-color:var(--bd);color:var(--t)}
+.btn-warn{background:var(--yw-d);color:var(--yw);border:1px solid var(--yw-d)}
+
+/* ── INV LAYOUT ── */
+.inv-wrap{display:flex;flex:1;overflow:hidden}
+.inv-content{flex:1;overflow-y:auto;padding:14px 20px}
+.inv-content::-webkit-scrollbar{width:4px}
+.inv-content::-webkit-scrollbar-thumb{background:var(--bd2)}
+.inv-panel{width:280px;border-left:1px solid var(--bd);background:var(--sf);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.inv-tabs{display:flex;border-bottom:1px solid var(--bd);flex-shrink:0}
+.it{flex:1;padding:8px 4px;font-size:11px;cursor:pointer;color:var(--t3);border-bottom:2px solid transparent;transition:all .15s;text-align:center;user-select:none}
+.it:hover{color:var(--t2)}.it.on{color:var(--ac);border-bottom-color:var(--ac)}
+.inv-panel-body{flex:1;overflow-y:auto;padding:12px}
+.inv-panel-body::-webkit-scrollbar{width:3px}
+.inv-panel-body::-webkit-scrollbar-thumb{background:var(--bd2)}
+.inv-sub-tabs{display:flex;border-bottom:1px solid var(--bd);flex-shrink:0;overflow-x:auto}
+.ist{padding:8px 14px;font-size:11px;cursor:pointer;color:var(--t3);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;user-select:none}
+.ist:hover{color:var(--t2)}.ist.on{color:var(--ac);border-bottom-color:var(--ac)}
+
+/* ── CARDS ── */
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;overflow:hidden;margin-bottom:12px}
+.ch{padding:9px 14px;border-bottom:1px solid var(--bd);font-size:10px;color:var(--t3);font-family:var(--mono);letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center}
+.sc2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.sv{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px}
+
+/* ── TIMELINE ── */
+.tlw{position:relative;padding-left:20px}
+.tll{position:absolute;left:5px;top:0;bottom:0;width:1px;background:var(--bd)}
+.tli{position:relative;margin-bottom:12px}
+.tld{position:absolute;left:-18px;top:4px;width:8px;height:8px;border-radius:50%;border:1.5px solid;background:var(--sf)}
+.tl-dt{font-size:10px;color:var(--t3);font-family:var(--mono);margin-bottom:2px}
+.tl-tt{font-size:12px;color:var(--t);line-height:1.4;margin-bottom:3px}
+
+/* ── EVIDENCE ── */
+.ev-col-hd{font-size:9px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;margin-bottom:8px;padding:4px 8px;border-radius:4px;display:inline-block}
+.ev-item{background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:9px 11px;margin-bottom:6px;font-size:11px;color:var(--t2);line-height:1.5}
+
+/* ── BRIEF ── */
+.brief-wrap{display:flex;flex:1;overflow:hidden}
+.brief-main{flex:1;overflow-y:auto;padding:14px 20px}
+.brief-main::-webkit-scrollbar{width:4px}
+.brief-main::-webkit-scrollbar-thumb{background:var(--bd2)}
+.brief-side{width:220px;border-left:1px solid var(--bd);background:var(--sf);padding:14px;overflow-y:auto;flex-shrink:0}
+.bs{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:13px;margin-bottom:10px}
+.bst{font-size:9px;font-weight:600;font-family:var(--mono);color:var(--t3);letter-spacing:.08em;margin-bottom:9px}
+.bc{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bd);font-size:12px}
+.bc:last-child{border-bottom:none}
+.bcs{width:15px;height:15px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;margin-top:1px}
+.mode-bar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;margin-bottom:14px}
+.tog{width:32px;height:18px;border-radius:9px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.tok{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;pointer-events:none}
+.tog.on{background:var(--ac)}.tog.on .tok{transform:translateX(14px)}
+.tog.off{background:var(--sf3)}
+
+/* ── PERPLEXICA ── */
+.pp-wrap{background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:10px}
+.pp-row{display:flex;gap:6px;margin-bottom:8px}
+.pp-inp{flex:1;background:var(--sf);border:1px solid var(--bd2);border-radius:5px;padding:6px 9px;color:var(--t);font-size:11px;font-family:var(--sans)}
+.pp-inp:focus{outline:none;border-color:var(--ac)}
+.pp-btn{padding:6px 10px;border-radius:5px;background:var(--ac-d);border:1px solid var(--ac);color:var(--ac);font-size:11px;cursor:pointer}
+.pp-out{font-size:11px;color:var(--t2);line-height:1.7;padding:8px;background:var(--sf);border-radius:5px}
+.pp-srcs{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.pp-src{font-size:9px;color:var(--ac);font-family:var(--mono);padding:1px 5px;border-radius:3px;background:var(--ac-d);cursor:pointer}
+
+/* ── VERIFY ── */
+.drop{border:1.5px dashed var(--bd2);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:14px}
+.drop:hover{border-color:var(--ac)}
+.vf-item{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--bd)}
+.vf-item:last-child{border-bottom:none}
+.vf-thumb{width:42px;height:42px;border-radius:6px;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+
+/* ── EXPORT CARDS ── */
+.ex-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sf2);border:1px solid var(--bd);border-radius:7px;cursor:pointer;transition:border-color .15s;margin-bottom:6px}
+.ex-item:hover{border-color:var(--bd2)}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div class="tb">
+  <div class="tb-logo"><div class="tb-dot"></div>OSINT//DESK<span class="tb-badge">User</span></div>
+  <div class="tb-nav">
+    <div class="tn on" onclick="gm('today',this)">📰 Today's Intel<span class="tn-ct" style="background:var(--rd-d);color:var(--rd)">3</span></div>
+    <div class="tn" onclick="gm('inv',this)">🔍 Investigation<span class="tn-ct" style="background:var(--yw-d);color:var(--yw)">5</span></div>
+    <div class="tn" onclick="gm('verify',this)">🛡 UGC Verify<span class="tn-ct" style="background:var(--yw-d);color:var(--yw)">2</span></div>
+    <div class="tn" onclick="gm('brief',this)">📋 Brief Builder</div>
+  </div>
+  <div class="tb-right">
+    <div class="live"><div class="live-dot"></div>pipeline active · 247 feeds</div>
+    <div class="admin-btn" onclick="alert('Admin view')">⚙ Admin</div>
+    <div class="ava">ส</div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══ PAGE 1: TODAY ══ -->
+<div class="mod on" id="m-today">
+<div class="pg">
+
+  <div class="ph">
+    <div>
+      <div class="ph-title">สวัสดีตอนเช้า สุเมธ</div>
+      <div class="ph-meta">วันพุธ 12 มิ.ย. 2568 · pipeline อัปเดต 08:20 น.</div>
+    </div>
+    <div style="font-size:11px;color:var(--t3);text-align:right;font-family:var(--mono)">วันนี้<br><span style="font-size:16px;font-weight:600;color:var(--gn)">247</span> feeds</div>
+  </div>
+
+  <!-- STATUS BAR — compact horizontal -->
+  <div class="status-bar">
+    <div class="sb-item">
+      <div class="sb-num" style="color:var(--rd)">3</div>
+      <div><div style="font-size:10px;font-weight:500;color:var(--rd)">Priority</div><div class="sb-lbl">ต้องดูทันที</div></div>
+    </div>
+    <div class="sb-item">
+      <div class="sb-num" style="color:var(--yw)">8</div>
+      <div><div style="font-size:10px;font-weight:500;color:var(--yw)">Investigate</div><div class="sb-lbl">ค้างอยู่</div></div>
+    </div>
+    <div class="sb-item">
+      <div class="sb-num" style="color:var(--t2)">21</div>
+      <div><div style="font-size:10px;font-weight:500;color:var(--t2)">Fast Track</div><div class="sb-lbl">verify ก่อน on-air</div></div>
+    </div>
+    <div class="sb-item">
+      <div class="sb-num" style="color:var(--gn)">14</div>
+      <div><div style="font-size:10px;font-weight:500;color:var(--gn)">Verified</div><div class="sb-lbl">พร้อม on-air</div></div>
+    </div>
+  </div>
+
+  <!-- PRIORITY -->
+  <div class="sec-hd" style="color:var(--rd)">🔴 PRIORITY — ต้องดูทันที</div>
+
+  <div class="ar rd" onclick="gm('inv',null)">
+    <div class="ar-body">
+      <div class="ar-meta">
+        <span class="vd vd-r">PRIORITY</span>
+        <span class="score-text">16/18</span>
+        <span style="color:var(--bd2)">·</span>
+        <span class="score-text">08:14 · กรมทางหลวง</span>
+      </div>
+      <div class="ar-title">บริษัท ABC Construction ชนะประมูลโครงการทางหลวง 4 สาย มูลค่า 2.8 พันล้านบาท</div>
+      <div class="ar-sum">AI: พบชนะประมูล 4 โครงการพร้อมกัน มูลค่าสูงผิดปกติ กรรมการปรากฏชื่อ NACC และเชื่อมโยงกับบริษัทแพ้ประมูลชื่อเดียวกัน</div>
+      <div class="ar-tags"><span class="tg" style="background:var(--ac-d);color:var(--ac)">🌐 เครือข่ายรับเหมา ↑340%</span></div>
+    </div>
+    <div class="ar-actions">
+      <button class="btn-p" onclick="event.stopPropagation();gm('inv',null)">🔍 สืบสวน</button>
+      <button class="btn-s" onclick="event.stopPropagation();gm('verify',null)">🛡 Verify</button>
+      <button class="btn-s" onclick="event.stopPropagation();gm('brief',null)">📋 Brief</button>
+    </div>
+  </div>
+
+  <div class="ar rd">
+    <div class="ar-body">
+      <div class="ar-meta">
+        <span class="vd vd-r">PRIORITY</span>
+        <span class="score-text">15/18</span>
+        <span style="color:var(--bd2)">·</span>
+        <span class="score-text">07:45 · NACC</span>
+      </div>
+      <div class="ar-title">ป.ป.ช. เผยแพร่บัญชีทรัพย์สินผู้ดำรงตำแหน่งการเมือง รอบใหม่ 48 ราย</div>
+      <div class="ar-sum">AI: พบผู้ดำรงตำแหน่งที่เคยเชื่อมกับ investigation หลายเรื่อง ตรวจสอบทรัพย์สินที่เพิ่มขึ้นผิดสัดส่วน</div>
+    </div>
+    <div class="ar-actions">
+      <button class="btn-p" onclick="gm('inv',null)">🔍 สืบสวน</button>
+      <button class="btn-s" onclick="gm('brief',null)">📋 Brief</button>
+    </div>
+  </div>
+
+  <!-- INVESTIGATE -->
+  <div class="sec-hd" style="color:var(--yw)">🟡 INVESTIGATE — รอดำเนินการ</div>
+
+  <div class="ar yw">
+    <div class="ar-body">
+      <div class="ar-meta">
+        <span class="vd vd-y">INVESTIGATE</span>
+        <span class="score-text">13/18 · 07:52</span>
+      </div>
+      <div class="ar-title">รัฐมนตรีพลังงานเซ็น MOU กับบริษัทจีน 3 แห่ง ด้านโซลาร์เซลล์และแบตเตอรี่</div>
+    </div>
+    <div class="ar-actions">
+      <button class="btn-p" onclick="gm('inv',null)">🔍 สืบสวน</button>
+    </div>
+  </div>
+
+  <div class="ar yw">
+    <div class="ar-body">
+      <div class="ar-meta">
+        <span class="vd vd-y">INVESTIGATE</span>
+        <span class="score-text">12/18 · 07:31 · UGC</span>
+      </div>
+      <div class="ar-title">พบคลิปไวรัลอ้างว่าเจ้าหน้าที่ตำรวจรับเงินในพื้นที่ภาคใต้</div>
+    </div>
+    <div class="ar-actions">
+      <button class="btn-p btn-warn" onclick="gm('verify',null)">🛡 Verify ก่อน</button>
+    </div>
+  </div>
+
+  <!-- FAST TRACK -->
+  <div class="sec-hd">⚡ FAST TRACK — verify ก่อน on-air</div>
+
+  <div class="ar">
+    <div class="ar-body">
+      <div class="ar-meta">
+        <span class="vd vd-b">FAST TRACK</span>
+        <span class="score-text">7/18 · 07:18 · revenue.go.th</span>
+      </div>
+      <div class="ar-title">กรมสรรพากรออกมาตรการลดหย่อนภาษี SME ประจำปี 2568</div>
+    </div>
+    <div class="ar-actions">
+      <button class="btn-s" onclick="gm('verify',null)">🛡 Verify</button>
+    </div>
+  </div>
+
+  <div class="ar">
+    <div class="ar-body">
+      <div class="ar-meta">
+        <span class="vd vd-b">FAST TRACK</span>
+        <span class="score-text">6/18 · 07:05 · SET</span>
+      </div>
+      <div class="ar-title">ตลาดหุ้นไทยเปิดตลาดเช้าปรับตัวขึ้น 0.4% กลุ่มพลังงานหนุน</div>
+    </div>
+    <div class="ar-actions">
+      <button class="btn-s" onclick="gm('verify',null)">🛡 Verify</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══ PAGE 2: INVESTIGATION ══ -->
+<div class="mod" id="m-inv">
+  <div class="inv-sub-tabs">
+    <div class="ist on" onclick="it('net',this)">Network Map</div>
+    <div class="ist" onclick="it('tl',this)">Timeline</div>
+    <div class="ist" onclick="it('ev',this)">Evidence Board</div>
+    <div class="ist" style="color:var(--ac);margin-left:auto" onclick="gm('brief',null)">→ Brief</div>
+  </div>
+  <div class="inv-wrap">
+    <div class="inv-content">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:600">ABC Construction</span>
+          <span class="vd vd-r">PRIORITY</span>
+          <span style="font-size:9px;padding:2px 6px;border-radius:3px;background:var(--yw-d);color:var(--yw);font-family:var(--mono)">D+2</span>
+        </div>
+        <span style="font-size:10px;color:var(--t3);font-family:var(--mono)">scan: 14m ago · 18 evidence</span>
+      </div>
+
+      <!-- NETWORK -->
+      <div id="it-net">
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;height:260px;overflow:hidden;margin-bottom:12px;position:relative">
+          <svg width="100%" height="260" viewBox="0 0 580 260">
+            <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 2L8 5L1 8" fill="none" stroke="#232838" stroke-width="1.5" stroke-linecap="round"/></marker></defs>
+            <line x1="270" y1="114" x2="168" y2="70" stroke="#232838" stroke-width="1" marker-end="url(#ar)"/>
+            <line x1="266" y1="128" x2="143" y2="128" stroke="#232838" stroke-width="1" marker-end="url(#ar)"/>
+            <line x1="270" y1="142" x2="168" y2="188" stroke="#232838" stroke-width="1" marker-end="url(#ar)"/>
+            <line x1="330" y1="114" x2="432" y2="70" stroke="#232838" stroke-width="1" marker-end="url(#ar)"/>
+            <line x1="334" y1="128" x2="456" y2="128" stroke="#232838" stroke-width="1" marker-end="url(#ar)"/>
+            <line x1="330" y1="142" x2="432" y2="188" stroke="#232838" stroke-width="1" marker-end="url(#ar)"/>
+            <line x1="168" y1="70" x2="432" y2="70" stroke="#B7860D" stroke-width="1" stroke-dasharray="4,3" opacity=".6"/>
+            <text x="300" y="57" text-anchor="middle" fill="#B7860D" font-size="9" font-family="IBM Plex Mono">pending verify</text>
+            <circle cx="300" cy="128" r="36" fill="#1A2B4A" stroke="#4B7BEC" stroke-width="1.5"/>
+            <text x="300" y="123" text-anchor="middle" fill="#93C5FD" font-size="10" font-weight="500" font-family="IBM Plex Mono">ABC</text>
+            <text x="300" y="136" text-anchor="middle" fill="#7BA4E8" font-size="9" font-family="IBM Plex Mono">Construction</text>
+            <circle cx="143" cy="62" r="24" fill="#0D2318" stroke="#1E8449" stroke-width="1"/>
+            <text x="143" y="58" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">นายสมชาย</text><text x="143" y="70" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">กรรมการ</text>
+            <circle cx="122" cy="128" r="24" fill="#0D2318" stroke="#1E8449" stroke-width="1"/>
+            <text x="122" y="124" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">abc-con</text><text x="122" y="136" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">.co.th</text>
+            <circle cx="143" cy="196" r="24" fill="#0D2318" stroke="#1E8449" stroke-width="1"/>
+            <text x="143" y="192" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">XYZ</text><text x="143" y="204" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">Holdings</text>
+            <circle cx="458" cy="62" r="24" fill="#1F1030" stroke="#6C3483" stroke-width="1.5"/>
+            <text x="458" y="58" text-anchor="middle" fill="#9B7FBF" font-size="8" font-family="IBM Plex Mono">นายวิชัย</text><text x="458" y="70" text-anchor="middle" fill="#9B7FBF" font-size="8" font-family="IBM Plex Mono">กรรมการ</text>
+            <circle cx="478" cy="128" r="24" fill="#0D2318" stroke="#1E8449" stroke-width="1"/>
+            <text x="478" y="124" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">THP Road</text><text x="478" y="136" text-anchor="middle" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">Co., Ltd.</text>
+            <circle cx="458" cy="196" r="24" fill="#2A1F08" stroke="#B7860D" stroke-width="1.5"/>
+            <text x="458" y="192" text-anchor="middle" fill="#C9A84C" font-size="8" font-family="IBM Plex Mono">103.21.x</text><text x="458" y="204" text-anchor="middle" fill="#C9A84C" font-size="8" font-family="IBM Plex Mono">shared IP</text>
+            <circle cx="554" cy="20" r="4" fill="#1E8449"><animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite"/></circle>
+            <text x="562" y="24" fill="#5CB87A" font-size="8" font-family="IBM Plex Mono">scanning</text>
+          </svg>
+        </div>
+        <div class="sc2">
+          <div class="sv"><div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-bottom:8px">ENTITIES</div>
+            <span style="font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid var(--bd);background:var(--sf2);color:var(--t2);display:inline-block;margin:2px;font-family:var(--mono)">👤 นายสมชาย</span>
+            <span style="font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid var(--bd);background:var(--sf2);color:var(--t2);display:inline-block;margin:2px;font-family:var(--mono)">👤 นายวิชัย</span>
+            <span style="font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid var(--bd);background:var(--sf2);color:var(--t2);display:inline-block;margin:2px;font-family:var(--mono)">🏢 XYZ Holdings</span>
+            <span style="font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid var(--bd);background:var(--sf2);color:var(--t2);display:inline-block;margin:2px;font-family:var(--mono)">🏢 THP Road</span>
+          </div>
+          <div class="sv"><div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-bottom:8px">MISSING LINKS</div>
+            <div style="font-size:11px;color:var(--yw);line-height:1.9">⚠ กรรมการทั้งสองเชื่อมกัน?<br>⚠ THP Road เคยแข่งประมูล?<br>⚠ IP 103.21 ชื่อใคร?</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div id="it-tl" style="display:none">
+        <div class="tlw"><div class="tll"></div>
+          <div class="tli"><div class="tld" style="border-color:var(--gn);background:var(--gn-d)"></div><div class="tl-dt">12 มิ.ย. 68 · 08:14</div><div class="tl-tt">ประกาศผลผู้ชนะ e-GP — กรมทางหลวง</div><span class="tg" style="background:var(--gn-d);color:var(--gn)">✓ verified · 3 แหล่ง</span></div>
+          <div class="tli"><div class="tld" style="border-color:var(--gn);background:var(--gn-d)"></div><div class="tl-dt">8 มิ.ย. 68</div><div class="tl-tt">DBD: จดทะเบียน ก.พ. 2566 ทุน 1 ล้าน กรรมการ: สมชาย, วิชัย</div><span class="tg" style="background:var(--gn-d);color:var(--gn)">✓ verified</span></div>
+          <div class="tli"><div class="tld" style="border-color:var(--yw);background:var(--yw-d)"></div><div class="tl-dt">5 มิ.ย. 68</div><div class="tl-tt">SpiderFoot: domain ทั้งสองจด email เดียวกัน</div><span class="tg" style="background:var(--yw-d);color:var(--yw)">⚠ partial</span></div>
+          <div class="tli"><div class="tld" style="border-color:var(--rd);background:var(--rd-d)"></div><div class="tl-dt">? ยังไม่ระบุ</div><div class="tl-tt">THP Road เคยประมูลแข่งกับ ABC ในโครงการเดียวกัน?</div><span class="tg" style="background:var(--rd-d);color:var(--rd)">✗ → ค้น e-GP ย้อนหลัง</span></div>
+        </div>
+      </div>
+
+      <!-- EVIDENCE -->
+      <div id="it-ev" style="display:none">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div>
+            <div class="ev-col-hd" style="background:var(--gn-d);color:var(--gn)">VERIFIED ✓</div>
+            <div class="ev-item" style="border-color:var(--gn-d)">ประกาศผลผู้ชนะ e-GP<br><span style="color:var(--t3)">go.th · archived</span></div>
+            <div class="ev-item" style="border-color:var(--gn-d)">ข้อมูล DBD กรรมการ<br><span style="color:var(--t3)">screenshot</span></div>
+          </div>
+          <div>
+            <div class="ev-col-hd" style="background:var(--yw-d);color:var(--yw)">PARTIAL ⚠</div>
+            <div class="ev-item" style="border-color:var(--yw-d)">Whois domain<br><span style="color:var(--t3)">ต้องยืนยัน</span></div>
+            <div class="ev-item" style="border-color:var(--yw-d)">NACC ทรัพย์สิน<br><span style="color:var(--t3)">ต้องเชื่อม</span></div>
+          </div>
+          <div>
+            <div class="ev-col-hd" style="background:var(--rd-d);color:var(--rd)">UNVERIFIED ✗</div>
+            <div class="ev-item" style="border-color:var(--rd-d)">THP Road ประมูลแข่ง?<br><span style="color:var(--t3)">→ e-GP</span></div>
+            <div class="ev-item" style="border-color:var(--rd-d)">IP 103.21 ชื่อใคร?<br><span style="color:var(--t3)">→ Shodan</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PANEL: Research / Notes -->
+    <div class="inv-panel">
+      <div class="inv-tabs">
+        <div class="it on" onclick="iside('perp',this)">🔎 Research</div>
+        <div class="it" onclick="iside('notes',this)">📝 Notes</div>
+        <div class="it" onclick="iside('src',this)">🔗 Sources</div>
+      </div>
+      <div class="inv-panel-body">
+
+        <div id="is-perp">
+          <div style="font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.06em;margin-bottom:8px">PERPLEXICA AI RESEARCH</div>
+          <div class="pp-wrap">
+            <div class="pp-row">
+              <input class="pp-inp" type="text" id="ppq" value="ABC Construction ประมูลทางหลวง"/>
+              <button class="pp-btn" onclick="doPerp()">→</button>
+            </div>
+            <div class="pp-out" id="ppout" style="color:var(--t3)">กดค้นหาเพื่อดูผลจาก Perplexica + SearXNG</div>
+          </div>
+        </div>
+
+        <div id="is-notes" style="display:none">
+          <div style="font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.06em;margin-bottom:8px">NOTES</div>
+          <textarea style="width:100%;height:180px;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:9px;color:var(--t2);font-size:11px;font-family:var(--sans);resize:none;line-height:1.7">- domain ทั้งสองมี IP เดียวกัน
+- นายวิชัย → ตรวจ NACC ด้วย
+- e-GP: หา THP Road ย้อนหลัง</textarea>
+          <button class="btn-s" style="margin-top:6px;font-size:11px">💾 บันทึก</button>
+        </div>
+
+        <div id="is-src" style="display:none">
+          <div style="font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.06em;margin-bottom:8px">SOURCES</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="background:var(--sf2);border-radius:5px;padding:8px 9px;font-size:11px"><div style="color:var(--gn);margin-bottom:1px">✓ e-GP ประกาศผล</div><div style="color:var(--t3);font-size:10px;font-family:var(--mono)">gprocurement.go.th</div></div>
+            <div style="background:var(--sf2);border-radius:5px;padding:8px 9px;font-size:11px"><div style="color:var(--gn);margin-bottom:1px">✓ DBD นิติบุคคล</div><div style="color:var(--t3);font-size:10px;font-family:var(--mono)">dbd.go.th · archived</div></div>
+            <div style="background:var(--sf2);border-radius:5px;padding:8px 9px;font-size:11px"><div style="color:var(--yw);margin-bottom:1px">⚠ Whois domain</div><div style="color:var(--t3);font-size:10px;font-family:var(--mono)">SpiderFoot · ต้องยืนยัน</div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE 3: VERIFY ══ -->
+<div class="mod" id="m-verify">
+<div class="pg">
+  <div class="sc2" style="margin-bottom:14px">
+    <div class="sv"><div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-bottom:5px">VERIFIED TODAY</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--gn)">12</div><div style="font-size:10px;color:var(--t3)">89% pass rate</div></div>
+    <div class="sv"><div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-bottom:5px">SUSPICIOUS</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--rd)">3</div><div style="font-size:10px;color:var(--t3)">ห้าม on-air</div></div>
+  </div>
+  <div class="drop">
+    <div style="font-size:32px;margin-bottom:8px">📎</div>
+    <div style="font-size:13px;color:var(--t2)">วางหรืออัปโหลดไฟล์</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:3px">JPG · PNG · MP4 · MOV · สูงสุด 500 MB</div>
+  </div>
+  <div class="card"><div class="ch"><span>ผลล่าสุด</span><span>15 ชิ้นวันนี้</span></div>
+    <div class="vf-item">
+      <div class="vf-thumb">🎬</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:500;margin-bottom:3px">clip_police_south_0612.mp4</div>
+        <div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-bottom:5px">GPS: 7.0045°N · 14:32 UTC+7</div>
+        <span class="tg" style="background:var(--rd-d);color:var(--rd)">⚠ พบคลิปเดิม 18 ก.พ. 67</span>
+        <span class="tg" style="background:var(--gn-d);color:var(--gn)">✓ EXIF ตรงกัน</span>
+        <span class="tg" style="background:var(--yw-d);color:var(--yw)">⚠ Geolocation ยังไม่ยืนยัน</span>
+      </div>
+      <span class="vd vd-y" style="flex-shrink:0;margin-top:2px">SUSPICIOUS</span>
+    </div>
+    <div class="vf-item">
+      <div class="vf-thumb">🖼</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:500;margin-bottom:3px">protest_bkk_0614_2.jpg</div>
+        <div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-bottom:5px">GPS: 13.7563°N · Canon EOS R5</div>
+        <span class="tg" style="background:var(--gn-d);color:var(--gn)">✓ First appearance confirmed</span>
+        <span class="tg" style="background:var(--gn-d);color:var(--gn)">✓ Geolocation ตรงกัน</span>
+      </div>
+      <span class="vd vd-g" style="flex-shrink:0;margin-top:2px">VERIFIED</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ PAGE 4: BRIEF ══ -->
+<div class="mod" id="m-brief">
+<div class="brief-wrap">
+  <div class="brief-main">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:600">Brief — ABC Construction</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-s" style="font-size:11px">📤 ส่ง Editor</button>
+        <button class="btn-s" style="font-size:11px">⬇ Export</button>
+      </div>
+    </div>
+
+    <div class="mode-bar">
+      <span style="font-size:11px;color:var(--t2)">โหมด:</span>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="display:flex;align-items:center;gap:5px;cursor:pointer" onclick="bm('int')">
+          <div class="tog on" id="ti"><div class="tok"></div></div>
+          <span style="font-size:11px">Internal</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;cursor:pointer" onclick="bm('pub')">
+          <div class="tog off" id="tp"><div class="tok"></div></div>
+          <span style="font-size:11px;color:var(--t2)">Public</span>
+        </div>
+      </div>
+      <div id="mb" style="margin-left:auto;font-size:9px;padding:2px 9px;border-radius:3px;background:var(--ac-d);color:var(--ac);font-family:var(--mono)">INTERNAL</div>
+    </div>
+
+    <div id="bi">
+      <div class="bs">
+        <div class="bst">FINDINGS — VERIFIED ✓</div>
+        <div class="bc"><div class="bcs" style="background:var(--gn-d);color:var(--gn)">✓</div><div style="flex:1;color:var(--t2);line-height:1.6">ABC Construction ชนะประมูล 4 โครงการ รวม 2.8 พันล้าน (e-GP · 3 แหล่ง)</div></div>
+        <div class="bc"><div class="bcs" style="background:var(--gn-d);color:var(--gn)">✓</div><div style="flex:1;color:var(--t2);line-height:1.6">DBD: จดทะเบียน ก.พ. 2566 ทุน 1 ล้าน กรรมการ: สมชาย + วิชัย</div></div>
+      </div>
+      <div class="bs">
+        <div class="bst">UNVERIFIED — ห้าม PUBLISH</div>
+        <div class="bc"><div class="bcs" style="background:var(--yw-d);color:var(--yw)">⚠</div><div style="flex:1;color:var(--t2);line-height:1.6">Domain ทั้งสองจด email เดียวกัน — ยังไม่ยืนยัน Whois</div></div>
+        <div class="bc"><div class="bcs" style="background:var(--rd-d);color:var(--rd)">✗</div><div style="flex:1;color:var(--t2);line-height:1.6">THP Road เคยประมูลแข่ง ABC? — ยังไม่ verify</div></div>
+      </div>
+      <div class="bs">
+        <div class="bst">MISSING LINKS</div>
+        <div style="font-size:12px;color:var(--t3);line-height:1.9">→ ค้น e-GP ย้อนหลัง: THP Road<br>→ Gephi betweenness กรรมการ<br>→ Shodan: IP 103.21.x.x</div>
+      </div>
+    </div>
+
+    <div id="bp" style="display:none">
+      <div style="border-left:2px solid var(--yw);padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--yw)">⚠ Public mode — verified ≥ 3 แหล่งเท่านั้น</div>
+      <div class="bs">
+        <div class="bst">VERIFIED FINDINGS</div>
+        <div class="bc"><div class="bcs" style="background:var(--gn-d);color:var(--gn)">✓</div><div style="flex:1;color:var(--t2);line-height:1.6">ABC Construction ชนะประมูล 4 โครงการทางหลวง รวม 2.8 พันล้าน ตาม e-GP</div></div>
+        <div class="bc"><div class="bcs" style="background:var(--gn-d);color:var(--gn)">✓</div><div style="flex:1;color:var(--t2);line-height:1.6">DBD ระบุจดทะเบียน ก.พ. 2566 ทุน 1 ล้าน มีกรรมการ 2 คน</div></div>
+      </div>
+      <div class="bs">
+        <div class="bst">METHODOLOGY</div>
+        <div style="font-size:12px;color:var(--t3);line-height:1.8">แหล่ง: e-GP, DBD, NACC · OSINT triangulation ≥ 3 · 12 มิ.ย. 2568</div>
+      </div>
+      <div style="background:var(--sf2);border-radius:6px;padding:9px 12px;font-size:11px;color:var(--t3)">2 claims ถูกซ่อน — pending verification</div>
+    </div>
+  </div>
+
+  <div class="brief-side">
+    <div style="font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.06em;margin-bottom:10px">EXPORT</div>
+    <div class="ex-item"><span style="font-size:18px">📄</span><div><div style="font-size:12px;font-weight:500">Internal PDF</div><div style="font-size:10px;color:var(--t2)">ทุก claim</div></div></div>
+    <div class="ex-item"><span style="font-size:18px">📰</span><div><div style="font-size:12px;font-weight:500">Public Report</div><div style="font-size:10px;color:var(--t2)">Bellingcat format</div></div></div>
+    <div class="ex-item"><span style="font-size:18px">🕸</span><div><div style="font-size:12px;font-weight:500">Network GEXF</div><div style="font-size:10px;color:var(--t2)">→ Gephi</div></div></div>
+    <div class="ex-item"><span style="font-size:18px">📊</span><div><div style="font-size:12px;font-weight:500">Evidence CSV</div><div style="font-size:10px;color:var(--t2)">รายการ evidence</div></div></div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)">
+      <div style="font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.06em;margin-bottom:8px">STATUS</div>
+      <div style="font-size:11px;color:var(--yw);padding:7px 9px;background:var(--yw-d);border-radius:5px">⏳ รอ editor อนุมัติ</div>
+    </div>
+  </div>
+</div>
+</div>
+
+</div><!-- end main -->
+
+<script>
+function gm(id,el){
+  document.querySelectorAll('.mod').forEach(m=>m.classList.remove('on'));
+  document.getElementById('m-'+id).classList.add('on');
+  document.querySelectorAll('.tn').forEach(n=>n.classList.remove('on'));
+  if(el&&el.classList) el.classList.add('on');
+}
+function it(tab,btn){
+  ['net','tl','ev'].forEach(t=>{const e=document.getElementById('it-'+t);if(e)e.style.display='none'});
+  document.getElementById('it-'+tab).style.display='block';
+  document.querySelectorAll('.ist').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+}
+function iside(tab,btn){
+  ['perp','notes','src'].forEach(t=>{const e=document.getElementById('is-'+t);if(e)e.style.display='none'});
+  document.getElementById('is-'+tab).style.display='block';
+  document.querySelectorAll('.it').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+}
+function bm(m){
+  const ii=m==='int';
+  document.getElementById('ti').className='tog '+(ii?'on':'off');
+  document.getElementById('tp').className='tog '+(ii?'off':'on');
+  document.getElementById('bi').style.display=ii?'block':'none';
+  document.getElementById('bp').style.display=ii?'none':'block';
+  const mb=document.getElementById('mb');
+  mb.textContent=ii?'INTERNAL':'PUBLIC';
+  mb.style.background=ii?'var(--ac-d)':'var(--gn-d)';
+  mb.style.color=ii?'var(--ac)':'var(--gn)';
+}
+function doPerp(){
+  const out=document.getElementById('ppout');
+  out.innerHTML='<span style="color:var(--t3)">กำลังค้นผ่าน SearXNG...</span>';
+  setTimeout(()=>{
+    out.innerHTML='ABC Construction จดทะเบียน ก.พ. 2566 ทุน 1 ล้านบาท มีกรรมการ 2 คน บริษัทชนะประมูลรัฐหลายสัญญารวมกว่า 3.5 พันล้านในช่วง 12 เดือนที่ผ่านมา<div class="pp-srcs"><span class="pp-src">DBD</span><span class="pp-src">e-GP</span><span class="pp-src">go.th</span></div>';
+  },700);
+}
+</script>
+</body>
+</html>

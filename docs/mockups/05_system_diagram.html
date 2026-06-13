@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>OSINT//DESK — System Diagram</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0C10;--sf:#111318;--sf2:#181C23;--sf3:#1E2330;
+  --bd:#1E2330;--bd2:#252B3A;
+  --t:#E2E8F0;--t2:#8892A4;--t3:#4A5568;
+  --ac:#3B82F6;--ac-d:#1E3A5F;
+  --gn:#10B981;--gn-d:#064E3B;
+  --yw:#F59E0B;--yw-d:#451A03;
+  --rd:#EF4444;--rd-d:#450A0A;
+  --pu:#8B5CF6;--pu-d:#2E1065;
+  --tl:#06B6D4;--tl-d:#164E63;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Inter',sans-serif;
+}
+body{background:var(--bg);color:var(--t);font-family:var(--sans);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.topbar{height:44px;border-bottom:1px solid var(--bd);background:var(--sf);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+.logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--ac);box-shadow:0 0 8px var(--ac)}
+.badge{font-size:10px;padding:1px 7px;border-radius:3px;font-family:var(--mono)}
+.level-bar{display:flex;gap:6px;margin-left:auto;align-items:center}
+.lvl-btn{padding:4px 12px;border-radius:4px;border:1px solid var(--bd2);background:var(--sf2);color:var(--t2);font-size:11px;cursor:pointer;font-family:var(--mono);transition:all .15s}
+.lvl-btn:hover{color:var(--t);border-color:var(--bd)}
+.lvl-btn.on{background:var(--ac-d);color:var(--ac);border-color:var(--ac)}
+.breadcrumb{font-size:11px;color:var(--t3);font-family:var(--mono);padding:0 14px;border-left:1px solid var(--bd)}
+
+/* CANVAS */
+.canvas{flex:1;overflow:auto;padding:32px;position:relative}
+.canvas::-webkit-scrollbar{width:6px;height:6px}
+.canvas::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
+
+/* NODES */
+.diagram{display:flex;flex-direction:column;align-items:center;min-width:900px}
+
+/* L0 — system */
+.l0-node{background:linear-gradient(135deg,#1E2A45,#1A1F2E);border:1.5px solid var(--ac);border-radius:16px;padding:20px 32px;text-align:center;cursor:pointer;transition:all .2s;position:relative;min-width:320px}
+.l0-node:hover{border-color:#60A5FA;box-shadow:0 0 24px rgba(59,130,246,.2)}
+.l0-node .title{font-size:18px;font-weight:600;margin-bottom:4px}
+.l0-node .sub{font-size:11px;color:var(--t2);font-family:var(--mono)}
+.expand-hint{font-size:10px;color:var(--ac);font-family:var(--mono);margin-top:8px;opacity:.7}
+
+/* CONNECTOR */
+.conn{display:flex;flex-direction:column;align-items:center}
+.conn-line{width:1px;background:var(--bd2);flex-shrink:0}
+.conn-dot{width:6px;height:6px;border-radius:50%;background:var(--bd2);flex-shrink:0}
+
+/* L1 row */
+.l1-row{display:flex;gap:0;align-items:flex-start;position:relative;width:100%}
+.l1-row::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:var(--bd2)}
+.l1-col{display:flex;flex-direction:column;align-items:center;flex:1;padding:0 8px}
+.l1-node{background:var(--sf);border:1px solid var(--bd2);border-radius:12px;padding:14px 16px;text-align:center;cursor:pointer;transition:all .2s;width:100%;position:relative}
+.l1-node:hover{border-color:var(--bd);background:var(--sf2)}
+.l1-node.on{border-color:inherit}
+.l1-node .ico{font-size:20px;margin-bottom:6px}
+.l1-node .lbl{font-size:12px;font-weight:600;margin-bottom:3px}
+.l1-node .desc{font-size:10px;color:var(--t3);line-height:1.5}
+.l1-badge{font-size:9px;padding:1px 6px;border-radius:3px;font-family:var(--mono);margin-top:6px;display:inline-block}
+
+/* L2 box */
+.l2-wrap{width:100%;margin-top:8px;overflow:hidden;max-height:0;transition:max-height .35s ease}
+.l2-wrap.open{max-height:600px}
+.l2-box{background:var(--sf2);border:1px solid var(--bd2);border-radius:10px;padding:12px;margin-top:8px}
+.l2-title{font-size:10px;font-weight:500;font-family:var(--mono);letter-spacing:.06em;color:var(--t2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+/* L2 items */
+.l2-items{display:flex;flex-direction:column;gap:6px}
+.l2-item{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all .15s;position:relative}
+.l2-item:hover{border-color:var(--bd2);background:var(--sf2)}
+.l2-item.open{border-color:inherit}
+.l2-item .i-head{display:flex;align-items:center;gap:8px}
+.l2-item .i-lbl{font-size:12px;font-weight:500;flex:1}
+.l2-item .i-type{font-size:9px;padding:1px 6px;border-radius:3px;font-family:var(--mono)}
+.l2-item .i-desc{font-size:11px;color:var(--t2);margin-top:5px;line-height:1.6}
+.l2-item .i-tools{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+.l2-item .tool{font-size:10px;padding:1px 7px;border-radius:3px;background:var(--sf3);border:1px solid var(--bd2);color:var(--t3);font-family:var(--mono)}
+
+/* L3 */
+.l3-wrap{overflow:hidden;max-height:0;transition:max-height .3s ease;margin-top:6px}
+.l3-wrap.open{max-height:400px}
+.l3-box{background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:5px}
+.l3-step{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:var(--t2);padding:5px 8px;border-radius:5px;background:var(--sf3)}
+.l3-num{font-family:var(--mono);font-size:10px;color:var(--t3);width:16px;flex-shrink:0;margin-top:1px}
+.l3-arrow{display:flex;justify-content:center;color:var(--t3);font-size:12px;margin:1px 0}
+
+/* FLOW LEGEND */
+.legend{display:flex;gap:16px;align-items:center;margin-top:16px;flex-wrap:wrap;justify-content:center}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)}
+.leg-dot{width:10px;height:10px;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-dot"></div>OSINT//DESK<span class="badge" style="background:var(--pu-d);color:var(--pu);margin-left:4px">Admin</span></div>
+  <span style="font-size:12px;color:var(--t2)">System Workflow Diagram</span>
+  <div class="level-bar">
+    <span style="font-size:11px;color:var(--t3);font-family:var(--mono)">Level:</span>
+    <button class="lvl-btn on" onclick="setLevel(0)">L0 System</button>
+    <button class="lvl-btn" onclick="setLevel(1)">L1 Modules</button>
+    <button class="lvl-btn" onclick="setLevel(2)">L2 Processes</button>
+    <button class="lvl-btn" onclick="setLevel(3)">L3 Steps</button>
+  </div>
+  <div class="breadcrumb" id="bc">OSINT//DESK</div>
+</div>
+
+<div class="canvas">
+<div class="diagram" id="diagram">
+
+  <!-- L0 -->
+  <div class="l0-node" onclick="setLevel(1)" id="l0">
+    <div class="title">🔭 OSINT//DESK</div>
+    <div class="sub">Amarin TV · Intelligence Platform</div>
+    <div style="display:flex;justify-content:center;gap:12px;margin-top:12px;flex-wrap:wrap">
+      <span class="badge" style="background:var(--gn-d);color:var(--gn)">⚙ Automated Pipeline</span>
+      <span class="badge" style="background:var(--ac-d);color:var(--ac)">👤 User Workspace</span>
+      <span class="badge" style="background:var(--pu-d);color:var(--pu)">📊 Admin View</span>
+    </div>
+    <div class="expand-hint">คลิกเพื่อ expand → L1</div>
+  </div>
+
+  <!-- L0→L1 connector -->
+  <div class="conn" id="conn0" style="display:none">
+    <div class="conn-line" style="height:24px"></div>
+    <div class="conn-dot"></div>
+  </div>
+
+  <!-- L1 ROW -->
+  <div class="l1-row" id="l1-row" style="display:none">
+
+    <!-- COL A: AUTO PIPELINE -->
+    <div class="l1-col">
+      <div class="conn-line" style="height:20px"></div>
+      <div class="l1-node" style="border-color:var(--gn)" onclick="toggleL1('auto')">
+        <div class="ico">⚙</div>
+        <div class="lbl" style="color:var(--gn)">Automated Pipeline</div>
+        <div class="desc">ทำงานเบื้องหลัง 24/7<br>ไม่ต้องมีคนกด</div>
+        <div class="l1-badge" style="background:var(--gn-d);color:var(--gn)">n8n · SpiderFoot · LLM</div>
+      </div>
+      <div class="l2-wrap" id="l2-auto">
+        <div class="l2-box" style="border-color:var(--gn-d)">
+          <div class="l2-title" style="color:var(--gn)">⚙ AUTOMATED PROCESSES</div>
+          <div class="l2-items">
+
+            <div class="l2-item" style="border-color:var(--gn-d)" onclick="toggleL2(this,'l3-ingest')">
+              <div class="i-head">
+                <span class="i-lbl">📥 Feed Ingestion</span>
+                <span class="i-type" style="background:var(--gn-d);color:var(--gn)">AUTO</span>
+              </div>
+              <div class="i-desc">ดูดข้อมูลจากทุกแหล่งตลอดเวลา</div>
+              <div class="i-tools"><span class="tool">n8n</span><span class="tool">RSS</span><span class="tool">GDELT</span><span class="tool">ACLED</span></div>
+              <div class="l3-wrap" id="l3-ingest">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>n8n poll RSS feeds ทุก 5 นาที จาก go.th, สำนักข่าว, GDELT</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>parse title, source, timestamp → queue ใน Redis</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>Celery worker รับ job → ส่งต่อ LLM scoring</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--gn-d)" onclick="toggleL2(this,'l3-score')">
+              <div class="i-head">
+                <span class="i-lbl">🤖 AI Triage Scoring</span>
+                <span class="i-type" style="background:var(--gn-d);color:var(--gn)">AUTO</span>
+              </div>
+              <div class="i-desc">LLM ให้คะแนน 7 เกณฑ์ต่อข่าว</div>
+              <div class="i-tools"><span class="tool">qwen3:8b</span><span class="tool">Ollama</span><span class="tool">PostgreSQL</span></div>
+              <div class="l3-wrap" id="l3-score">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>qwen3:8b รับ news item → score 7 criteria (0-18)</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>extract entities (บุคคล, บริษัท, สถานที่)</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>assign verdict: PASS / FAST / INVESTIGATE / PRIORITY</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">4</span><span>store ใน PostgreSQL + trigger alert ถ้า score ≥ 11</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--gn-d)" onclick="toggleL2(this,'l3-env')">
+              <div class="i-head">
+                <span class="i-lbl">🌐 Environment Signal</span>
+                <span class="i-type" style="background:var(--gn-d);color:var(--gn)">AUTO</span>
+              </div>
+              <div class="i-desc">monitor landscape 24/7 ตรวจจับ pattern</div>
+              <div class="i-tools"><span class="tool">SearXNG</span><span class="tool">Perplexica</span><span class="tool">Neo4j</span></div>
+              <div class="l3-wrap" id="l3-env">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>SearXNG query environment keywords ทุก 1 ชั่วโมง</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>LLM classify ว่าตรงกับ environment ไหน</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>คำนวณ signal intensity เทียบกับ 30d average</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">4</span><span>SURGE alert ถ้า > 200% → notify Intelligence Lead</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--gn-d)" onclick="toggleL2(this,'l3-watch')">
+              <div class="i-head">
+                <span class="i-lbl">⭐ Watchlist Scan</span>
+                <span class="i-type" style="background:var(--gn-d);color:var(--gn)">AUTO</span>
+              </div>
+              <div class="i-desc">monitor entities ต่อเนื่อง แจ้งเตือนเมื่อพบใหม่</div>
+              <div class="i-tools"><span class="tool">SpiderFoot</span><span class="tool">SearXNG</span><span class="tool">DBD API</span></div>
+              <div class="l3-wrap" id="l3-watch">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>SpiderFoot scheduled scan ทุก entity ใน watchlist</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>SearXNG query ชื่อ entity + site:go.th</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>diff กับ previous scan → ถ้ามี URL ใหม่ = alert</span></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COL B: USER WORKSPACE -->
+    <div class="l1-col">
+      <div class="conn-line" style="height:20px"></div>
+      <div class="l1-node" style="border-color:var(--ac)" onclick="toggleL1('user')">
+        <div class="ico">👤</div>
+        <div class="lbl" style="color:var(--ac)">User Workspace</div>
+        <div class="desc">4 หน้าที่ user ใช้งานจริง<br>รับผลจาก automated pipeline</div>
+        <div class="l1-badge" style="background:var(--ac-d);color:var(--ac)">นักข่าว · Analyst · Editor</div>
+      </div>
+      <div class="l2-wrap" id="l2-user">
+        <div class="l2-box" style="border-color:var(--ac-d)">
+          <div class="l2-title" style="color:var(--ac)">👤 USER WORKFLOW (4 หน้า)</div>
+          <div class="l2-items">
+
+            <div class="l2-item" style="border-color:var(--ac-d)" onclick="toggleL2(this,'l3-today')">
+              <div class="i-head">
+                <span class="i-lbl">📰 Today's Intelligence</span>
+                <span class="i-type" style="background:var(--ac-d);color:var(--ac)">หน้าแรก</span>
+              </div>
+              <div class="i-desc">เปิดมาเช้าเห็น Priority alerts ทันที — กด trigger investigation</div>
+              <div class="i-tools"><span class="tool">triage results</span><span class="tool">env alerts</span><span class="tool">daily brief</span></div>
+              <div class="l3-wrap" id="l3-today">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>เห็น Priority feed ที่ระบบ score ≥ 11 ไว้แล้ว</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>คลิก item → ดู AI summary + triage breakdown</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>กด "เปิด Investigation" หรือ "Fast Verify UGC"</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--ac-d)" onclick="toggleL2(this,'l3-inv2')">
+              <div class="i-head">
+                <span class="i-lbl">🔍 Investigation Workspace</span>
+                <span class="i-type" style="background:var(--ac-d);color:var(--ac)">หน้า 2</span>
+              </div>
+              <div class="i-desc">สืบสวนเชิงลึก — ดู graph, เพิ่ม evidence, research</div>
+              <div class="i-tools"><span class="tool">Network graph</span><span class="tool">Timeline</span><span class="tool">Perplexica</span></div>
+              <div class="l3-wrap" id="l3-inv2">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>ดู network graph จาก SpiderFoot (Neo4j)</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>ค้นหาข้อมูลเพิ่มด้วย Perplexica (embedded)</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>เพิ่ม evidence card ลง board พร้อม source citation</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">4</span><span>ส่งต่อ → Brief Builder</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--ac-d)" onclick="toggleL2(this,'l3-ugc2')">
+              <div class="i-head">
+                <span class="i-lbl">🛡 UGC Verify</span>
+                <span class="i-type" style="background:var(--ac-d);color:var(--ac)">หน้า 3</span>
+              </div>
+              <div class="i-desc">อัปโหลด media → ดูผล verify ทันที</div>
+              <div class="i-tools"><span class="tool">ExifTool</span><span class="tool">Wayback</span><span class="tool">SearXNG img</span></div>
+              <div class="l3-wrap" id="l3-ugc2">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>drag & drop ไฟล์ → ExifTool extract metadata</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>Wayback CDX ตรวจ first appearance</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>SearXNG reverse image + LLM vision context</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">4</span><span>verdict: VERIFIED / SUSPICIOUS / FAKE</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--ac-d)" onclick="toggleL2(this,'l3-brief2')">
+              <div class="i-head">
+                <span class="i-lbl">📋 Brief Builder</span>
+                <span class="i-type" style="background:var(--ac-d);color:var(--ac)">หน้า 4</span>
+              </div>
+              <div class="i-desc">draft → approve → export Internal/Public</div>
+              <div class="i-tools"><span class="tool">LLM draft</span><span class="tool">Approval</span><span class="tool">PDF export</span></div>
+              <div class="l3-wrap" id="l3-brief2">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">1</span><span>LLM auto-draft จาก verified evidence</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">2</span><span>toggle Internal (ทุก claim) / Public (verified only)</span></div>
+                  <div class="l3-arrow">↓</div>
+                  <div class="l3-step"><span class="l3-num">3</span><span>ส่ง Editor approve → export PDF / GEXF / CSV</span></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COL C: ADMIN -->
+    <div class="l1-col">
+      <div class="conn-line" style="height:20px"></div>
+      <div class="l1-node" style="border-color:var(--pu)" onclick="toggleL1('admin')">
+        <div class="ico">📊</div>
+        <div class="lbl" style="color:var(--pu)">Admin View</div>
+        <div class="desc">มองเห็น workflow ครบ<br>config pipeline + KPI</div>
+        <div class="l1-badge" style="background:var(--pu-d);color:var(--pu)">Intelligence Lead · MD</div>
+      </div>
+      <div class="l2-wrap" id="l2-admin">
+        <div class="l2-box" style="border-color:var(--pu-d)">
+          <div class="l2-title" style="color:var(--pu)">📊 ADMIN SECTIONS</div>
+          <div class="l2-items">
+
+            <div class="l2-item" style="border-color:var(--pu-d)" onclick="toggleL2(this,'l3-dash2')">
+              <div class="i-head">
+                <span class="i-lbl">📊 Operations Dashboard</span>
+                <span class="i-type" style="background:var(--pu-d);color:var(--pu)">ADMIN</span>
+              </div>
+              <div class="i-desc">KPI ทั้งหมด: cases, briefs, verify rate, team load</div>
+              <div class="i-tools"><span class="tool">Grafana</span><span class="tool">PostgreSQL</span></div>
+              <div class="l3-wrap" id="l3-dash2">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">•</span><span>Active Cases + milestone progress</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>Briefs published / pending / approval rate</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>UGC verify pass rate (ควร > 85%)</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>Triage score distribution ย้อนหลัง 30 วัน</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>Team workload per analyst</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--pu-d)" onclick="toggleL2(this,'l3-env2')">
+              <div class="i-head">
+                <span class="i-lbl">🌐 Environment Config</span>
+                <span class="i-type" style="background:var(--pu-d);color:var(--pu)">ADMIN</span>
+              </div>
+              <div class="i-desc">จัดการ landscape ที่ monitor — เพิ่ม/ลบ/ปรับ threshold</div>
+              <div class="i-tools"><span class="tool">SearXNG</span><span class="tool">keyword sets</span></div>
+              <div class="l3-wrap" id="l3-env2">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">•</span><span>เพิ่ม environment ใหม่ + กำหนด keywords</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>ปรับ SURGE threshold (default 200%)</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>Signal history graph ย้อนหลัง 90 วัน</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--pu-d)" onclick="toggleL2(this,'l3-watch2')">
+              <div class="i-head">
+                <span class="i-lbl">⭐ Watchlist Manager</span>
+                <span class="i-type" style="background:var(--pu-d);color:var(--pu)">ADMIN</span>
+              </div>
+              <div class="i-desc">จัดการ entities ที่ monitor — เพิ่ม/ลบ/ดู alert history</div>
+              <div class="i-tools"><span class="tool">SpiderFoot</span><span class="tool">SearXNG</span></div>
+              <div class="l3-wrap" id="l3-watch2">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">•</span><span>เพิ่ม entity: ชื่อ / บริษัท / โดเมน / keyword</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>กำหนด scan frequency และ sources</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>ดู alert history ย้อนหลัง</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--pu-d)" onclick="toggleL2(this,'l3-cases2')">
+              <div class="i-head">
+                <span class="i-lbl">📁 Cases Overview</span>
+                <span class="i-type" style="background:var(--pu-d);color:var(--pu)">ADMIN</span>
+              </div>
+              <div class="i-desc">ดู investigation ทุกเรื่อง assign งาน ติดตาม deadline</div>
+              <div class="i-tools"><span class="tool">PostgreSQL</span><span class="tool">RBAC</span></div>
+              <div class="l3-wrap" id="l3-cases2">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">•</span><span>Active / Closed cases ทั้งหมด</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>Milestone tracking + deadline</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>Assign analyst + set priority</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="l2-item" style="border-color:var(--pu-d)" onclick="toggleL2(this,'l3-sys')">
+              <div class="i-head">
+                <span class="i-lbl">⚙ System Settings</span>
+                <span class="i-type" style="background:var(--pu-d);color:var(--pu)">ADMIN</span>
+              </div>
+              <div class="i-desc">config pipeline, LLM model, scan schedule, users</div>
+              <div class="i-tools"><span class="tool">Ollama</span><span class="tool">n8n</span><span class="tool">users</span></div>
+              <div class="l3-wrap" id="l3-sys">
+                <div class="l3-box">
+                  <div class="l3-step"><span class="l3-num">•</span><span>เลือก LLM model (qwen3:8b / gemma4:27b)</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>Triage matrix weights (ปรับน้ำหนัก criteria)</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>n8n schedule config + feed sources</span></div>
+                  <div class="l3-step"><span class="l3-num">•</span><span>User management + RBAC roles</span></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end l1-row -->
+
+  <!-- LEGEND -->
+  <div class="legend" id="legend" style="display:none">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--gn)"></div>Automated (ไม่ต้องกด)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--ac)"></div>User action (กดได้)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--pu)"></div>Admin only</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--yw)"></div>AI/LLM</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--tl)"></div>Search engine</div>
+  </div>
+
+</div><!-- end diagram -->
+</div><!-- end canvas -->
+
+<script>
+let currentLevel = 0;
+
+function setLevel(n) {
+  currentLevel = n;
+  document.querySelectorAll('.lvl-btn').forEach((b,i) => b.classList.toggle('on', i === n));
+
+  const l0 = document.getElementById('l0');
+  const conn0 = document.getElementById('conn0');
+  const l1row = document.getElementById('l1-row');
+  const legend = document.getElementById('legend');
+
+  if (n === 0) {
+    l0.style.display = 'block';
+    conn0.style.display = 'none';
+    l1row.style.display = 'none';
+    legend.style.display = 'none';
+    closeAllL2();
+    document.getElementById('bc').textContent = 'OSINT//DESK';
+  } else {
+    l0.style.display = 'block';
+    conn0.style.display = 'flex';
+    l1row.style.display = 'flex';
+    legend.style.display = 'flex';
+    document.getElementById('bc').textContent = 'OSINT//DESK → Modules';
+    if (n >= 2) {
+      openAllL2();
+      document.getElementById('bc').textContent = 'OSINT//DESK → Modules → Processes';
+    } else {
+      closeAllL2();
+    }
+    if (n >= 3) {
+      openAllL3();
+      document.getElementById('bc').textContent = 'OSINT//DESK → Modules → Processes → Steps';
+    } else {
+      closeAllL3();
+    }
+  }
+}
+
+function toggleL1(id) {
+  const wrap = document.getElementById('l2-' + id);
+  const isOpen = wrap.classList.contains('open');
+  wrap.classList.toggle('open', !isOpen);
+  if (!isOpen && currentLevel < 2) currentLevel = 2;
+}
+
+function toggleL2(item, l3id) {
+  const l3 = document.getElementById(l3id);
+  const isOpen = l3.classList.contains('open');
+  l3.classList.toggle('open', !isOpen);
+  item.classList.toggle('open', !isOpen);
+  if (!isOpen && currentLevel < 3) currentLevel = 3;
+}
+
+function openAllL2() {
+  document.querySelectorAll('.l2-wrap').forEach(w => w.classList.add('open'));
+}
+function closeAllL2() {
+  document.querySelectorAll('.l2-wrap').forEach(w => w.classList.remove('open'));
+  closeAllL3();
+}
+function openAllL3() {
+  document.querySelectorAll('.l3-wrap').forEach(w => w.classList.add('open'));
+  document.querySelectorAll('.l2-item').forEach(i => i.classList.add('open'));
+}
+function closeAllL3() {
+  document.querySelectorAll('.l3-wrap').forEach(w => w.classList.remove('open'));
+  document.querySelectorAll('.l2-item').forEach(i => i.classList.remove('open'));
+}
+</script>
+</body>
+</html>
