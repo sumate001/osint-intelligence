@@ -157,6 +157,8 @@ async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
         ("MinIO",        "http://minio:9000/minio/health/live"),
         ("SearXNG",      "http://searxng:8080/"),
         ("Neo4j",        "http://neo4j:7474"),
+        ("SpiderFoot",   "http://spiderfoot:5001/"),
+        ("n8n",          "http://n8n:5678/healthz"),
     ]
     async with httpx.AsyncClient(timeout=3.0) as client:
         for name, url in core_http:
@@ -172,17 +174,17 @@ async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
                 latency = round((time.monotonic() - t0) * 1000, 1)
                 results.append(ServiceHealth(name=name, status="error", latency_ms=latency, detail=str(exc)[:120]))
 
-        # ── Optional add-ons: only check if configured (non-localhost URL) ──
-        optional: list[tuple[str, str]] = [
-            ("Perplexica", f"{settings_merged.perplexica.url}/api/health"),
-            ("SpiderFoot", f"{settings_merged.spiderfoot.url}/api/v1/ping"),
-            ("MiroFish",   f"{settings_merged.mirofish.url}/health"),
-            ("n8n",        f"{settings_merged.n8n.url}/healthz"),
+        # ── Optional add-ons: only check if base URL is a real host ───────
+        # Build URL from base + path so an empty base doesn't sneak through
+        optional: list[tuple[str, str, str]] = [
+            ("Perplexica", settings_merged.perplexica.url, "/api/health"),
+            ("MiroFish",   settings_merged.mirofish.url,   "/health"),
         ]
-        for name, url in optional:
-            if not url or "localhost" in url or "127.0.0.1" in url:
+        for name, base, path in optional:
+            if not base or "localhost" in base or "127.0.0.1" in base:
                 results.append(ServiceHealth(name=name, status="unknown", detail="not configured"))
                 continue
+            url = f"{base.rstrip('/')}{path}"
             t0 = time.monotonic()
             try:
                 resp = await client.get(url)

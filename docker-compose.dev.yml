@@ -101,6 +101,27 @@ services:
       SEARXNG_BASE_URL: http://localhost:8080/
     restart: unless-stopped
 
+  spiderfoot:
+    image: spiderfoot/spiderfoot:latest
+    container_name: osint-spiderfoot
+    ports:
+      - "5001:5001"
+    volumes:
+      - spiderfoot-data:/home/spiderfoot/.spiderfoot
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: osint-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: Asia/Bangkok
+    volumes:
+      - n8n-data:/home/node/.n8n
+    restart: unless-stopped
+
   perplexica-backend:
     build:
       context: https://github.com/ItzCrazyKns/Perplexica.git
@@ -211,3 +232,5 @@ volumes:
   neo4j-data:
   meili-data:
   minio-data:
+  spiderfoot-data:
+  n8n-data:
