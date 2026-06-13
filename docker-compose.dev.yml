@@ -124,6 +124,16 @@ services:
       - n8n-data:/home/node/.n8n
     restart: unless-stopped
 
+  mirofish:
+    image: ghcr.io/666ghj/mirofish:latest
+    container_name: osint-mirofish
+    ports:
+      - "5002:5001"                              # backend: internal 5001 → host 5002
+      - "5003:3000"                              # frontend: internal 3000 → host 5003 (3000 ถูก OSINT frontend ใช้)
+    volumes:
+      - mirofish-uploads:/app/backend/uploads
+    restart: unless-stopped
+
   perplexica-backend:
     build:
       context: https://github.com/ItzCrazyKns/Perplexica.git
@@ -236,3 +246,4 @@ volumes:
   minio-data:
   spiderfoot-data:
   n8n-data:
+  mirofish-uploads:

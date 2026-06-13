@@ -158,6 +158,7 @@ async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
         ("SearXNG",      "http://searxng:8080/"),
         ("Neo4j",        "http://neo4j:7474"),
         ("SpiderFoot",   "http://spiderfoot:5001/"),
+        ("MiroFish",     "http://mirofish:5001/"),
         ("n8n",          "http://n8n:5678/healthz"),
     ]
     async with httpx.AsyncClient(timeout=3.0) as client:
@@ -178,7 +179,6 @@ async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
         # Build URL from base + path so an empty base doesn't sneak through
         optional: list[tuple[str, str, str]] = [
             ("Perplexica", settings_merged.perplexica.url, "/api/health"),
-            ("MiroFish",   settings_merged.mirofish.url,   "/health"),
         ]
         for name, base, path in optional:
             if not base or "localhost" in base or "127.0.0.1" in base:
