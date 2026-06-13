@@ -137,6 +137,22 @@ services:
     command: celery -A app.worker worker --loglevel=info
     restart: unless-stopped
 
+  beat:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: osint-beat
+    env_file: .env
+    volumes:
+      - ./services/api:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+      - worker
+    command: celery -A app.worker beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./services/frontend
@@ -148,7 +164,12 @@ services:
       - ./services/frontend:/app
       - /app/node_modules
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      INTERNAL_API_URL: http://api:8000          # server-side → Docker network
+      INTERNAL_SEARXNG_URL: http://searxng:8080  # server-side → Docker network
+      NEXT_PUBLIC_API_URL: http://localhost:8000  # kept for SSR fallback
+      # NEXT_PUBLIC_PERPLEXICA_URL: http://localhost:3001  # uncomment when Perplexica is running
+    depends_on:
+      - api
     command: pnpm dev
     restart: unless-stopped
 

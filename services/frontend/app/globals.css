@@ -1,0 +1,63 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0d0f14;
+  --surface: #13161d;
+  --surface-2: #191d26;
+  --surface-3: #1f2330;
+  --border: #232838;
+  --border-2: #2c3347;
+  --text: #c9d1e0;
+  --text-2: #7a869a;
+  --text-3: #445068;
+  --accent: #4b7bec;
+  --green: #1e8449;
+  --yellow: #b7860d;
+  --red: #c0392b;
+  --purple: #7d3c98;
+  --teal: #16a085;
+  --darkweb: #2c3e50;
+  --darkweb-s: #7fb3d3;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Noto Sans Thai", "Inter", sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
+
+
+@keyframes scan-progress {
+  0%   { transform: translateX(-100%); width: 40%; }
+  50%  { transform: translateX(150%);  width: 60%; }
+  100% { transform: translateX(-100%); width: 40%; }
+}
