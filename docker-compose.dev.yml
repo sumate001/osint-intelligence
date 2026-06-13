@@ -130,6 +130,13 @@ services:
     ports:
       - "5002:5001"                              # backend: internal 5001 → host 5002
       - "5003:3000"                              # frontend: internal 3000 → host 5003 (3000 ถูก OSINT frontend ใช้)
+    environment:
+      LLM_API_KEY: "ollama"                      # Ollama ไม่ต้องการ key จริง
+      LLM_BASE_URL: "http://host.docker.internal:11434/v1"
+      LLM_MODEL_NAME: "${OLLAMA_DEFAULT_MODEL:-qwen3.5:latest}"
+      ZEP_API_KEY: "${ZEP_API_KEY:-}"            # ใส่ใน .env — รับฟรีที่ https://app.getzep.com/
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - mirofish-uploads:/app/backend/uploads
     restart: unless-stopped
