@@ -6,22 +6,26 @@ import { Topbar } from "@/components/layout/Topbar";
 import { useSimulations } from "@/lib/hooks/useSimulation";
 import { useCases } from "@/lib/hooks/useCase";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/lib/hooks/useT";
 
 export default function SimulationListPage() {
   const { data: jobs = [], isLoading } = useSimulations();
   const { data: casesData } = useCases();
   const cases = casesData?.items ?? [];
+  const t = useT();
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Scenario Simulation" subtitle="MiroFish Engine" />
+      <Topbar title={t("simulation.title")} subtitle="MiroFish Engine" />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Start from a case */}
         <div>
-          <p className="text-xs text-[var(--text-3)] uppercase tracking-wider font-medium mb-3">เลือก Case เพื่อเริ่ม Simulation</p>
+          <p className="text-xs text-[var(--text-3)] uppercase tracking-wider font-medium mb-3">
+            {t("investigation.title")}
+          </p>
           {cases.length === 0 ? (
-            <p className="text-sm text-[var(--text-3)]">ยังไม่มี case — ไปที่ Investigation เพื่อสร้าง case ก่อน</p>
+            <p className="text-sm text-[var(--text-3)]">{t("investigation.no_cases")}</p>
           ) : (
             <div className="grid grid-cols-2 gap-3 max-w-2xl">
               {cases.map((c) => (
@@ -46,7 +50,9 @@ export default function SimulationListPage() {
         {/* Recent jobs */}
         {jobs.length > 0 && (
           <div>
-            <p className="text-xs text-[var(--text-3)] uppercase tracking-wider font-medium mb-3">Simulation ล่าสุด</p>
+            <p className="text-xs text-[var(--text-3)] uppercase tracking-wider font-medium mb-3">
+              {t("simulation.title")}
+            </p>
             <div className="space-y-2 max-w-2xl">
               {isLoading ? (
                 <RefreshCw size={16} className="animate-spin text-[var(--text-3)]" />
@@ -60,13 +66,13 @@ export default function SimulationListPage() {
                     <div className="flex items-center gap-3">
                       <span className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                        j.status === "DONE" ? "text-[var(--green)] bg-[var(--green)]/10" :
+                        j.status === "DONE"    ? "text-[var(--green)] bg-[var(--green)]/10" :
                         j.status === "RUNNING" ? "text-[var(--yellow)] bg-[var(--yellow)]/10" :
-                        j.status === "FAILED" ? "text-[var(--red)] bg-[var(--red)]/10" :
+                        j.status === "FAILED"  ? "text-[var(--red)] bg-[var(--red)]/10" :
                         "text-[var(--text-3)] bg-[var(--surface-3)]"
                       )}>{j.status}</span>
                       <span className="text-xs text-[var(--text)]">
-                        {(j.config as Record<string, unknown>)?.agents?.toString()} agents ·{" "}
+                        {(j.config as Record<string, unknown>)?.agents?.toString()} {t("simulation.agents")} ·{" "}
                         {(j.config as Record<string, unknown>)?.timeframe?.toString()}d
                       </span>
                     </div>
@@ -77,6 +83,13 @@ export default function SimulationListPage() {
                 ))
               )}
             </div>
+          </div>
+        )}
+
+        {!isLoading && jobs.length === 0 && cases.length === 0 && (
+          <div className="text-center py-16 text-[var(--text-3)]">
+            <Zap size={40} className="mx-auto mb-3 opacity-20" />
+            <p className="text-sm">{t("simulation.no_simulations")}</p>
           </div>
         )}
       </div>

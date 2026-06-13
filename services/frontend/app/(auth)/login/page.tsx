@@ -7,18 +7,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/lib/stores/auth";
 import { apiLogin } from "@/lib/api/client";
+import { useT } from "@/lib/hooks/useT";
 
-const schema = z.object({
-  email: z.string().email("กรุณากรอกอีเมลให้ถูกต้อง"),
-  password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
-});
-
-type FormData = z.infer<typeof schema>;
+type FormData = { email: string; password: string };
 
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
+
+  const schema = z.object({
+    email: z.string().email(t("login.email_invalid")),
+    password: z.string().min(1, t("login.password_required")),
+  });
 
   const {
     register,
@@ -33,7 +35,7 @@ export default function LoginPage() {
       setAuth(result.access_token, result.user_id, result.role);
       router.push("/today");
     } catch {
-      setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+      setError(t("login.error_invalid"));
     }
   };
 
@@ -44,13 +46,13 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-[var(--text)] font-mono tracking-wider">
             OSINT//DESK
           </h1>
-          <p className="text-[var(--text-2)] mt-1 text-sm">Newsroom Intelligence Platform</p>
+          <p className="text-[var(--text-2)] mt-1 text-sm">{t("login.subtitle")}</p>
         </div>
 
         <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className="block text-sm text-[var(--text-2)] mb-1">อีเมล</label>
+              <label className="block text-sm text-[var(--text-2)] mb-1">{t("login.email")}</label>
               <input
                 {...register("email")}
                 type="email"
@@ -64,7 +66,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm text-[var(--text-2)] mb-1">รหัสผ่าน</label>
+              <label className="block text-sm text-[var(--text-2)] mb-1">{t("login.password")}</label>
               <input
                 {...register("password")}
                 type="password"
@@ -88,7 +90,7 @@ export default function LoginPage() {
               disabled={isSubmitting}
               className="w-full bg-[var(--accent)] text-white rounded px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {isSubmitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+              {isSubmitting ? t("login.submitting") : t("login.submit")}
             </button>
           </form>
         </div>

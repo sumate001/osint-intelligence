@@ -6,7 +6,10 @@ import { useAdminSettings, useSaveSettings, useAdminUsers, useCreateUser, useUpd
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils/cn";
 import type { AdminSettings, SettingsPatch, AdminUser, UserCreate } from "@/lib/api/admin";
-import { Save, RefreshCw, Plus, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle, Download, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Save, RefreshCw, Plus, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle, Download, Eye, EyeOff, ExternalLink, Globe } from "lucide-react";
+import { useT } from "@/lib/hooks/useT";
+import { useLocaleStore } from "@/lib/stores/locale";
+import { LOCALES, LOCALE_LABELS } from "@/lib/i18n";
 
 // ─── shared primitives ──────────────────────────────────────────────────────
 const inputCls = "w-full bg-[var(--surface-2)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--accent)] placeholder:text-[var(--text-3)]";
@@ -54,13 +57,44 @@ function PasswordInput({ value, onChange, placeholder }: { value: string; onChan
 }
 
 function SaveBar({ onSave, saving, saved }: { onSave: () => void; saving: boolean; saved: boolean }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-3 pt-6">
       <button onClick={onSave} disabled={saving} className={saveBtn}>
         {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-        บันทึก
+        {saving ? t("common.saving") : t("common.save")}
       </button>
-      {saved && <span className="text-xs text-[var(--green)] flex items-center gap-1"><CheckCircle2 size={12} />บันทึกแล้ว</span>}
+      {saved && <span className="text-xs text-[var(--green)] flex items-center gap-1"><CheckCircle2 size={12} />{t("common.saved")}</span>}
+    </div>
+  );
+}
+
+function LanguageSection() {
+  const t = useT();
+  const { locale, setLocale } = useLocaleStore();
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[var(--text-2)]">{t("settings.language_select")}</p>
+      <div className="flex gap-2">
+        {LOCALES.map((l) => (
+          <button
+            key={l}
+            onClick={() => setLocale(l)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors",
+              locale === l
+                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                : "bg-[var(--surface-2)] text-[var(--text-2)] border-[var(--border)] hover:border-[var(--border-2)]"
+            )}
+          >
+            <Globe size={14} />
+            {LOCALE_LABELS[l]}
+          </button>
+        ))}
+      </div>
+      <p className="text-[10px] text-[var(--text-3)]">
+        {t("settings.language")} — {LOCALE_LABELS[locale]}
+      </p>
     </div>
   );
 }
@@ -81,6 +115,7 @@ const TABS = [
   { id: "roles",         icon: "🔑", label: "Roles & Permissions" },
   { id: "health",        icon: "💚", label: "Service Health" },
   { id: "logs",          icon: "📜", label: "System Logs" },
+  { id: "language",      icon: "🌐", label: "Language" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -723,6 +758,7 @@ function LogsSection() {
 export default function AdminSettingsPage() {
   const { data: remote, isLoading } = useAdminSettings();
   const save = useSaveSettings();
+  const t = useT();
 
   // local draft per section
   const [draft, setDraft] = useState<Partial<AdminSettings>>({});
@@ -758,7 +794,7 @@ export default function AdminSettingsPage() {
     return (
       <div className="flex flex-col h-full">
         <Topbar title="Admin Settings" />
-        <div className="flex-1 flex items-center justify-center text-[var(--text-3)]">กำลังโหลด...</div>
+        <div className="flex-1 flex items-center justify-center text-[var(--text-3)]">{t("common.loading")}</div>
       </div>
     );
   }
@@ -859,6 +895,7 @@ export default function AdminSettingsPage() {
             {activeTab === "roles" && <RolesSection />}
             {activeTab === "health" && <HealthSection />}
             {activeTab === "logs" && <LogsSection />}
+            {activeTab === "language" && <LanguageSection />}
           </div>
         </div>
       </div>

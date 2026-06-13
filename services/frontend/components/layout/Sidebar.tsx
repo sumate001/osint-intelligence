@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebarStore } from "@/lib/stores/sidebar";
+import { useLocaleStore } from "@/lib/stores/locale";
+import { useT } from "@/lib/hooks/useT";
 import { cn } from "@/lib/utils/cn";
 import {
   Newspaper,
@@ -19,26 +21,29 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useRouter } from "next/navigation";
-
-const NAV_ITEMS = [
-  { label: "Today's Intel", href: "/today", icon: Newspaper },
-  { label: "Investigation", href: "/investigation", icon: Search },
-  { label: "Verify", href: "/verify", icon: ShieldCheck },
-  { label: "Brief", href: "/brief", icon: FileText },
-  { label: "Intelligence", href: "/intelligence", icon: Target },
-  { label: "Simulation", href: "/simulation", icon: Zap },
-  { label: "Dark Web", href: "/darkweb", icon: Globe },
-];
-
-const ADMIN_ITEMS = [
-  { label: "Settings", href: "/admin/settings", icon: Settings },
-];
+import { LOCALES, LOCALE_LABELS } from "@/lib/i18n";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarStore();
   const { logout } = useAuthStore();
+  const { locale, setLocale } = useLocaleStore();
   const router = useRouter();
+  const t = useT();
+
+  const NAV_ITEMS = [
+    { label: t("nav.today"), href: "/today", icon: Newspaper },
+    { label: t("nav.investigation"), href: "/investigation", icon: Search },
+    { label: t("nav.verify"), href: "/verify", icon: ShieldCheck },
+    { label: t("nav.brief"), href: "/brief", icon: FileText },
+    { label: t("nav.intelligence"), href: "/intelligence", icon: Target },
+    { label: t("nav.simulation"), href: "/simulation", icon: Zap },
+    { label: t("nav.darkweb"), href: "/darkweb", icon: Globe },
+  ];
+
+  const ADMIN_ITEMS = [
+    { label: t("nav.settings"), href: "/admin/settings", icon: Settings },
+  ];
 
   const handleLogout = () => {
     logout();
@@ -112,15 +117,37 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* Language switcher */}
+      {!collapsed && (
+        <div className="px-2.5 pb-2">
+          <div className="flex rounded overflow-hidden border border-[var(--border)]">
+            {LOCALES.map((l) => (
+              <button
+                key={l}
+                onClick={() => setLocale(l)}
+                className={cn(
+                  "flex-1 py-1 text-xs font-medium transition-colors",
+                  locale === l
+                    ? "bg-[var(--accent)] text-white"
+                    : "text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--surface-3)]"
+                )}
+              >
+                {LOCALE_LABELS[l]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="p-1.5 border-t border-[var(--border)]">
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 w-full px-2.5 py-2 rounded text-sm text-[var(--text-2)] hover:bg-[var(--surface-3)] hover:text-[var(--red)] transition-colors"
-          title={collapsed ? "ออกจากระบบ" : undefined}
+          title={collapsed ? t("nav.logout") : undefined}
         >
           <LogOut size={16} className="shrink-0" />
-          {!collapsed && <span>ออกจากระบบ</span>}
+          {!collapsed && <span>{t("nav.logout")}</span>}
         </button>
       </div>
     </aside>

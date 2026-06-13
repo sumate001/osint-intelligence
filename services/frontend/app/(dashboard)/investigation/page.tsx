@@ -8,6 +8,7 @@ import { useCases, useCreateCase } from "@/lib/hooks/useCase";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/format";
 import type { CaseStatus } from "@/lib/types/investigation";
+import { useT } from "@/lib/hooks/useT";
 
 const STATUS_COLORS: Record<CaseStatus, string> = {
   ACTIVE: "text-[var(--accent)]",
@@ -26,6 +27,7 @@ export default function InvestigationPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const t = useT();
 
   const { data, isLoading } = useCases();
   const createCase = useCreateCase();
@@ -43,7 +45,7 @@ export default function InvestigationPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Investigation" />
+      <Topbar title={t("investigation.title")} />
 
       <div className="flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
@@ -54,24 +56,24 @@ export default function InvestigationPage() {
               className="flex items-center gap-2 bg-[var(--accent)] text-white text-sm px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
             >
               <Plus size={15} />
-              New Case
+              {t("investigation.new_case")}
             </button>
           </div>
 
           {/* Create form */}
           {showCreate && (
             <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-xl p-4 space-y-3">
-              <p className="text-sm font-semibold text-[var(--text)]">New Investigation Case</p>
+              <p className="text-sm font-semibold text-[var(--text)]">{t("investigation.new_case")}</p>
               <input
                 autoFocus
-                placeholder="ชื่อ case *"
+                placeholder={t("investigation.case_name_placeholder")}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] outline-none"
               />
               <textarea
-                placeholder="คำอธิบาย (optional)"
+                placeholder={t("common.none")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
@@ -83,13 +85,13 @@ export default function InvestigationPage() {
                   disabled={!title.trim() || createCase.isPending}
                   className="flex-1 bg-[var(--accent)] text-white text-sm rounded-lg py-2 hover:opacity-90 disabled:opacity-50"
                 >
-                  {createCase.isPending ? "กำลังสร้าง..." : "สร้าง Case"}
+                  {createCase.isPending ? t("common.saving") : t("common.create")}
                 </button>
                 <button
                   onClick={() => setShowCreate(false)}
                   className="px-4 bg-[var(--surface-2)] text-[var(--text-2)] text-sm rounded-lg py-2 hover:bg-[var(--surface-3)]"
                 >
-                  ยกเลิก
+                  {t("common.cancel")}
                 </button>
               </div>
             </div>
@@ -97,11 +99,11 @@ export default function InvestigationPage() {
 
           {/* Case list */}
           {isLoading ? (
-            <div className="text-center py-12 text-[var(--text-3)] text-sm">กำลังโหลด...</div>
+            <div className="text-center py-12 text-[var(--text-3)] text-sm">{t("common.loading")}</div>
           ) : cases.length === 0 ? (
             <div className="text-center py-16 text-[var(--text-3)]">
               <FolderOpen size={40} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm">ยังไม่มี case — กด New Case เพื่อเริ่มสืบสวน</p>
+              <p className="text-sm">{t("investigation.no_cases")}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -128,9 +130,9 @@ export default function InvestigationPage() {
                     {formatDate(c.created_at)}
                     {c.tags.length > 0 && (
                       <span className="ml-2 flex gap-1">
-                        {c.tags.map((t) => (
-                          <span key={t} className="bg-[var(--surface-3)] px-1.5 py-0.5 rounded text-[9px]">
-                            {t}
+                        {c.tags.map((tag) => (
+                          <span key={tag} className="bg-[var(--surface-3)] px-1.5 py-0.5 rounded text-[9px]">
+                            {tag}
                           </span>
                         ))}
                       </span>

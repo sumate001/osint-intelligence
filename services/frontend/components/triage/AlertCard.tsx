@@ -5,6 +5,7 @@ import { VerdictBadge } from "@/components/ui/VerdictBadge";
 import { timeAgo, scoreColor } from "@/lib/utils/format";
 import { ExternalLink, Eye } from "lucide-react";
 import { useUpdateFeedItem } from "@/lib/hooks/useFeedItems";
+import { useT } from "@/lib/hooks/useT";
 import { cn } from "@/lib/utils/cn";
 
 interface AlertCardProps {
@@ -14,6 +15,7 @@ interface AlertCardProps {
 
 export function AlertCard({ item, onClick }: AlertCardProps) {
   const { mutate: updateItem } = useUpdateFeedItem();
+  const t = useT();
 
   const handleMarkRead = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -40,7 +42,7 @@ export function AlertCard({ item, onClick }: AlertCardProps) {
             {admiraltyLabel}
           </span>
           {item.verified_source && (
-            <span className="text-[10px] text-[var(--green)] font-medium">✓ Verified source</span>
+            <span className="text-[10px] text-[var(--green)] font-medium">{t("today.verified_source")}</span>
           )}
         </div>
 
@@ -57,7 +59,7 @@ export function AlertCard({ item, onClick }: AlertCardProps) {
               "p-1 rounded hover:bg-[var(--surface-2)]",
               item.is_read ? "text-[var(--text-3)]" : "text-[var(--accent)]"
             )}
-            title="Mark as read"
+            title={t("today.mark_read")}
           >
             <Eye size={14} />
           </button>
@@ -74,7 +76,7 @@ export function AlertCard({ item, onClick }: AlertCardProps) {
 
       <div className="flex items-center justify-between text-[10px] text-[var(--text-3)]">
         <div className="flex items-center gap-2">
-          <span className="font-mono">{item.source_id}</span>
+          <span className="font-mono">{item.source_name ?? item.source_id}</span>
           <span>·</span>
           <span>{timeAgo(item.published_at || item.ingested_at)}</span>
         </div>
@@ -88,12 +90,11 @@ export function AlertCard({ item, onClick }: AlertCardProps) {
             className="flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
           >
             <ExternalLink size={10} />
-            <span>Source</span>
+            <span>{t("today.source")}</span>
           </a>
         )}
       </div>
 
-      {/* Score mini-bar */}
       {item.total_score !== null && (
         <div className="mt-3 h-1 bg-[var(--surface-2)] rounded-full overflow-hidden">
           <div

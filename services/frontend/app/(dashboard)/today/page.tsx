@@ -11,6 +11,7 @@ import type { FeedItem } from "@/lib/types/triage";
 import { LayoutGrid, List, RefreshCw, Search } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { formatDate, scoreColor } from "@/lib/utils/format";
+import { useT } from "@/lib/hooks/useT";
 
 type ViewMode = "cards" | "table";
 type VerdictFilter = "ALL" | "PRIORITY" | "INVESTIGATE" | "FAST_TRACK" | "PASS";
@@ -22,6 +23,7 @@ export default function TodayPage() {
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("ALL");
   const [search, setSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
+  const t = useT();
 
   const { data, isLoading, isError, error, refetch, isFetching } = useFeedItems({
     verdict: verdictFilter !== "ALL" ? verdictFilter : undefined,
@@ -32,9 +34,14 @@ export default function TodayPage() {
 
   const items = data?.items ?? [];
 
+  const filterLabel = (v: VerdictFilter) => {
+    if (v === "ALL") return t("common.all");
+    return t(`verdict.${v}`);
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Today's Intel" />
+      <Topbar title={t("today.title")} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main content */}
@@ -57,7 +64,7 @@ export default function TodayPage() {
                       : "text-[var(--text-3)] hover:text-[var(--text-2)]"
                   )}
                 >
-                  {v === "ALL" ? "All" : v.replace("_", " ")}
+                  {filterLabel(v)}
                 </button>
               ))}
             </div>
@@ -68,7 +75,7 @@ export default function TodayPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="ค้นหา..."
+                placeholder={t("today.search")}
                 className="bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--text-3)] outline-none w-full"
               />
             </div>
@@ -78,7 +85,7 @@ export default function TodayPage() {
               <button
                 onClick={() => refetch()}
                 className="p-1.5 rounded hover:bg-[var(--surface)] text-[var(--text-2)]"
-                title="Refresh"
+                title={t("common.refresh")}
               >
                 <RefreshCw size={14} className={cn(isFetching && "animate-spin")} />
               </button>
@@ -116,20 +123,20 @@ export default function TodayPage() {
             {isError ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3">
                 <p className="text-[var(--red)] text-sm">
-                  {(error as Error)?.message || "ไม่สามารถโหลดข้อมูลได้"}
+                  {(error as Error)?.message || t("today.error")}
                 </p>
                 <button
                   onClick={() => refetch()}
                   className="text-xs text-[var(--accent)] hover:underline"
                 >
-                  ลองใหม่
+                  {t("common.refresh")}
                 </button>
               </div>
             ) : isLoading ? (
               <div className="flex items-center justify-center h-40">
                 <div className="flex gap-2 text-[var(--text-3)] text-sm">
                   <RefreshCw size={16} className="animate-spin" />
-                  <span>กำลังโหลด...</span>
+                  <span>{t("today.loading")}</span>
                 </div>
               </div>
             ) : view === "cards" ? (
@@ -143,7 +150,7 @@ export default function TodayPage() {
                 ))}
                 {items.length === 0 && (
                   <div className="col-span-full flex items-center justify-center h-40 text-[var(--text-3)] text-sm">
-                    ไม่มีข่าวในขณะนี้
+                    {t("today.no_items")}
                   </div>
                 )}
               </div>
@@ -160,7 +167,7 @@ export default function TodayPage() {
 
           {data && (
             <div className="text-xs text-[var(--text-3)] text-right">
-              แสดง {items.length} จาก {data.total} รายการ
+              {items.length} / {data.total}
             </div>
           )}
         </div>
@@ -200,7 +207,7 @@ export default function TodayPage() {
 
             {/* Scores breakdown */}
             <div className="space-y-2">
-              <div className="text-[10px] text-[var(--text-3)] uppercase tracking-wide">Scores</div>
+              <div className="text-[10px] text-[var(--text-3)] uppercase tracking-wide">{t("today.score")}</div>
               {[
                 { label: "Relevance", v: selectedItem.score_relevance },
                 { label: "Urgency", v: selectedItem.score_urgency },
@@ -258,7 +265,8 @@ export default function TodayPage() {
             {/* Meta */}
             <div className="border-t border-[var(--border)] pt-3 space-y-1.5 text-xs text-[var(--text-3)]">
               <div>
-                <span className="text-[var(--text-2)]">Source:</span> {selectedItem.source_id}
+                <span className="text-[var(--text-2)]">{t("today.source")}:</span>{" "}
+                {selectedItem.source_name ?? selectedItem.source_id}
               </div>
               <div>
                 <span className="text-[var(--text-2)]">Type:</span> {selectedItem.source_type}

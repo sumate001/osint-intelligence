@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Play, RefreshCw, CheckCircle, XCircle, AlertCircle, FileText, Eye } from "lucide-react";
+import { Shield, Play, RefreshCw, CheckCircle, XCircle, AlertCircle, Eye } from "lucide-react";
 import { Topbar } from "@/components/layout/Topbar";
 import { useDWStats, useDWResults, useLegalQueue, useAuditLog, useStartQuery, useReviewResult } from "@/lib/hooks/useDarkweb";
 import { cn } from "@/lib/utils/cn";
+import { useT } from "@/lib/hooks/useT";
 
 type Tab = "results" | "legal" | "audit";
 const METHOD_OPTIONS = [
@@ -20,6 +21,7 @@ export default function DarkWebPage() {
   const [method, setMethod] = useState("ahmia");
   const [queryError, setQueryError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const t = useT();
 
   const { data: stats } = useDWStats();
   const { data: results = [], isLoading: resultsLoading } = useDWResults();
@@ -29,22 +31,22 @@ export default function DarkWebPage() {
   const reviewResult = useReviewResult();
 
   async function handleQuery() {
-    if (!queryText.trim()) { setQueryError("ระบุ query ก่อน"); return; }
-    if (!reason.trim()) { setQueryError("ต้องระบุ editorial purpose ก่อนเสมอ"); return; }
+    if (!queryText.trim()) { setQueryError(t("darkweb.query_placeholder")); return; }
+    if (!reason.trim()) { setQueryError(t("darkweb.purpose_label")); return; }
     setQueryError(null);
     try {
       await startQuery.mutateAsync({ query_text: queryText, reason, method });
       setQueryText("");
       setReason("");
     } catch (err) {
-      setQueryError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      setQueryError(err instanceof Error ? err.message : t("common.error"));
     }
   }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Topbar
-        title="Dark Web Intelligence"
+        title={t("darkweb.title")}
         badge={{ text: "⚠ editorial purpose only", variant: "warning" }}
       />
 
@@ -62,10 +64,10 @@ export default function DarkWebPage() {
           {/* Stats */}
           <div className="px-3 py-3 border-b border-[var(--border)] space-y-1">
             {[
-              { label: "ทั้งหมด", value: stats?.total ?? 0, color: "" },
-              { label: "Flagged", value: stats?.flagged ?? 0, color: "text-[var(--yellow)]" },
-              { label: "Blocked", value: stats?.blocked ?? 0, color: "text-[var(--red)]" },
-              { label: "Legal Review", value: stats?.legal_pending ?? 0, color: "text-[var(--accent)]" },
+              { label: t("common.total"),       value: stats?.total ?? 0,         color: "" },
+              { label: "Flagged",                value: stats?.flagged ?? 0,       color: "text-[var(--yellow)]" },
+              { label: "Blocked",                value: stats?.blocked ?? 0,       color: "text-[var(--red)]" },
+              { label: t("darkweb.legal_review"),value: stats?.legal_pending ?? 0, color: "text-[var(--accent)]" },
             ].map((s) => (
               <div key={s.label} className="flex items-center justify-between">
                 <span className="text-[10px] text-[var(--text-3)]">{s.label}</span>
@@ -77,9 +79,9 @@ export default function DarkWebPage() {
           {/* Nav */}
           <nav className="flex-1 p-2 space-y-0.5">
             {([
-              { id: "results" as Tab, label: "🌑 Results", badge: stats?.total },
-              { id: "legal" as Tab, label: "⚖ Legal Review", badge: stats?.legal_pending },
-              { id: "audit" as Tab, label: "📋 Chain of Custody", badge: null },
+              { id: "results" as Tab, label: "🌑 Results",            badge: stats?.total },
+              { id: "legal"   as Tab, label: `⚖ ${t("darkweb.legal_review")}`, badge: stats?.legal_pending },
+              { id: "audit"   as Tab, label: "📋 Chain of Custody",   badge: null },
             ]).map((item) => (
               <button
                 key={item.id}
@@ -109,12 +111,12 @@ export default function DarkWebPage() {
             <div className="border-b border-[var(--border)] bg-[var(--surface)] p-4 space-y-3 shrink-0">
               <p className="text-[10px] text-[var(--text-3)] uppercase tracking-wider font-medium flex items-center gap-1">
                 <Shield size={10} className="text-[var(--darkweb-s)]" />
-                Targeted Query — ระบุเป้าหมาย ไม่ใช่ crawl แบบ blind
+                Targeted Query
               </p>
 
               <div className="flex gap-2">
                 <input
-                  placeholder="คำค้นหา เช่น ชื่อบริษัท บุคคล เหตุการณ์"
+                  placeholder={t("darkweb.query_placeholder")}
                   value={queryText}
                   onChange={(e) => { setQueryText(e.target.value); setQueryError(null); }}
                   onKeyDown={(e) => e.key === "Enter" && handleQuery()}
@@ -136,16 +138,16 @@ export default function DarkWebPage() {
                   className="flex items-center gap-1.5 bg-[var(--darkweb)] text-[var(--darkweb-s)] text-xs px-4 py-2 rounded hover:opacity-90 disabled:opacity-50 border border-[var(--darkweb-s)]/20"
                 >
                   {startQuery.isPending ? <RefreshCw size={11} className="animate-spin" /> : <Play size={11} />}
-                  เริ่ม Crawl
+                  {startQuery.isPending ? t("darkweb.crawling") : t("darkweb.start")}
                 </button>
               </div>
 
               <div>
                 <p className="text-[10px] text-[var(--red)] mb-1 flex items-center gap-1">
-                  <AlertCircle size={10} /> ต้องระบุ editorial purpose ก่อน:
+                  <AlertCircle size={10} /> {t("darkweb.purpose_label")}
                 </p>
                 <textarea
-                  placeholder="เช่น: ตรวจสอบการรั่วไหลข้อมูลที่เกี่ยวกับคดี ABC Construction"
+                  placeholder={t("darkweb.purpose_placeholder")}
                   value={reason}
                   onChange={(e) => { setReason(e.target.value); setQueryError(null); }}
                   rows={2}
@@ -160,6 +162,8 @@ export default function DarkWebPage() {
                   </p>
                 )}
               </div>
+
+              <p className="text-[10px] text-[var(--text-3)]">⚠ {t("darkweb.warning")}</p>
             </div>
           )}
 
@@ -173,7 +177,7 @@ export default function DarkWebPage() {
                 </div>
               ) : results.length === 0 ? (
                 <div className="text-center py-12 text-[var(--text-3)] text-sm">
-                  ยังไม่มีผลลัพธ์ — เริ่ม query ด้านบน
+                  {t("darkweb.no_results")}
                 </div>
               ) : (
                 results.map((r) => (
@@ -197,14 +201,18 @@ export default function DarkWebPage() {
                               "text-[var(--green)] bg-[var(--green)]/15"
                             )}>{r.classification}</span>
                             {r.legal_status === "PENDING" && (
-                              <span className="text-[9px] text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded">legal review</span>
+                              <span className="text-[9px] text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded">
+                                {t("darkweb.legal_review")}
+                              </span>
                             )}
                             {r.legal_status === "APPROVED" && (
-                              <span className="text-[9px] text-[var(--green)] bg-[var(--green)]/10 px-1.5 py-0.5 rounded">approved</span>
+                              <span className="text-[9px] text-[var(--green)] bg-[var(--green)]/10 px-1.5 py-0.5 rounded">
+                                {t("brief.approved")}
+                              </span>
                             )}
                           </div>
                           <p className="text-xs font-medium text-[var(--text)]">
-                            {r.classification === "BLOCKED" ? "[เนื้อหาถูก block — ไม่แสดง]" : r.title || r.onion_url.slice(0, 40) + "..."}
+                            {r.classification === "BLOCKED" ? "[blocked]" : r.title || r.onion_url.slice(0, 40) + "..."}
                           </p>
                           {r.classification !== "BLOCKED" && (
                             <p className="text-[10px] text-[var(--text-3)] font-mono mt-0.5">
@@ -251,13 +259,12 @@ export default function DarkWebPage() {
               <div className="space-y-3">
                 <div className="bg-[var(--surface-2)] border border-[var(--border)] rounded-xl p-3 mb-4">
                   <p className="text-[10px] text-[var(--text-2)] leading-relaxed">
-                    <span className="text-[var(--accent)] font-medium">⚖ Legal Review Queue</span>
-                    {" "}— รายการเหล่านี้ classifier ประเมินว่าอาจมีประโยชน์ต่อการสืบสวน แต่ต้องให้ Intelligence Lead ตรวจสอบก่อนที่ข้อมูลจะเข้า pipeline หลัก
+                    <span className="text-[var(--accent)] font-medium">⚖ {t("darkweb.legal_review")}</span>
                   </p>
                 </div>
 
                 {legalQueue.length === 0 ? (
-                  <div className="text-center py-12 text-[var(--text-3)] text-sm">ไม่มีรายการรอ review</div>
+                  <div className="text-center py-12 text-[var(--text-3)] text-sm">{t("common.none")}</div>
                 ) : (
                   legalQueue.map((r) => (
                     <div key={r.id} className="border border-[var(--border)] rounded-xl p-4 bg-[var(--surface-2)] space-y-3">
@@ -276,14 +283,14 @@ export default function DarkWebPage() {
                           disabled={reviewResult.isPending}
                           className="flex items-center gap-1 text-xs bg-[var(--green)]/10 text-[var(--green)] border border-[var(--green)]/30 px-3 py-1.5 rounded hover:bg-[var(--green)]/20 disabled:opacity-50"
                         >
-                          <CheckCircle size={11} /> ✓ อนุมัติ — เข้า pipeline
+                          <CheckCircle size={11} /> {t("brief.approve")}
                         </button>
                         <button
                           onClick={() => reviewResult.mutate({ id: r.id, action: "reject" })}
                           disabled={reviewResult.isPending}
                           className="flex items-center gap-1 text-xs bg-[var(--red)]/10 text-[var(--red)] border border-[var(--red)]/30 px-3 py-1.5 rounded hover:bg-[var(--red)]/20 disabled:opacity-50"
                         >
-                          <XCircle size={11} /> ✗ ปฏิเสธ
+                          <XCircle size={11} /> {t("brief.reject")}
                         </button>
                       </div>
                     </div>
@@ -299,10 +306,10 @@ export default function DarkWebPage() {
                   <p className="text-xs text-[var(--text-2)] font-medium">
                     📋 Chain of Custody — Audit Log (append-only)
                   </p>
-                  <span className="text-[10px] text-[var(--text-3)]">ไม่สามารถแก้ไขหรือลบได้</span>
+                  <span className="text-[10px] text-[var(--text-3)]">{t("common.no")} delete</span>
                 </div>
                 {auditLog.length === 0 ? (
-                  <div className="text-center py-12 text-[var(--text-3)] text-sm">ยังไม่มี activity</div>
+                  <div className="text-center py-12 text-[var(--text-3)] text-sm">{t("common.none")}</div>
                 ) : (
                   auditLog.map((entry) => (
                     <div key={entry.id} className="flex items-start gap-3 py-2 border-b border-[var(--border)] last:border-0">
