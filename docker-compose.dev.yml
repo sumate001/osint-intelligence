@@ -102,16 +102,18 @@ services:
     restart: unless-stopped
 
   spiderfoot:
-    image: spiderfoot/spiderfoot:latest
+    build:
+      context: https://github.com/smicallef/spiderfoot.git
+      dockerfile: Dockerfile
     container_name: osint-spiderfoot
     ports:
       - "5001:5001"
     volumes:
-      - spiderfoot-data:/home/spiderfoot/.spiderfoot
+      - spiderfoot-data:/var/lib/spiderfoot
     restart: unless-stopped
 
   n8n:
-    image: n8nio/n8n:latest
+    image: docker.n8n.io/n8nio/n8n:latest
     container_name: osint-n8n
     ports:
       - "5678:5678"
