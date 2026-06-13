@@ -10,6 +10,7 @@ import { Save, RefreshCw, Plus, Trash2, Pencil, CheckCircle2, XCircle, AlertCirc
 import { useT } from "@/lib/hooks/useT";
 import { useLocaleStore } from "@/lib/stores/locale";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n";
+import { UpdateModal } from "@/components/admin/UpdateModal";
 
 // ─── shared primitives ──────────────────────────────────────────────────────
 const inputCls = "w-full bg-[var(--surface-2)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--accent)] placeholder:text-[var(--text-3)]";
@@ -658,8 +659,28 @@ function RolesSection() {
 // ─── SECTION: Service Health ─────────────────────────────────────────────────
 function HealthSection() {
   const { data: services = [], isLoading, refetch, isFetching } = useServiceHealth();
+  const [showUpdate, setShowUpdate] = useState(false);
   return (
     <div className="space-y-4">
+      {/* Update button */}
+      <div className="flex items-center gap-3 p-4 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-[var(--text)]">Update System</p>
+          <p className="text-xs text-[var(--text-3)] mt-0.5">
+            Pull latest code from GitHub, rebuild images, and restart services.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowUpdate(true)}
+          className="flex items-center gap-2 bg-[var(--accent)] text-white text-sm px-4 py-2 rounded-lg hover:opacity-90 shrink-0"
+        >
+          <Download size={14} />
+          Update
+        </button>
+      </div>
+
+      {showUpdate && <UpdateModal onClose={() => setShowUpdate(false)} />}
+
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--text-3)]">ตรวจสอบทุก 30 วินาที</p>
         <button onClick={() => refetch()} disabled={isFetching} className={cn(ghostBtn)}>

@@ -111,6 +111,9 @@ services:
       - "8000:8000"
     volumes:
       - ./services/api:/app
+      - ./:/repo                               # repo root — สำหรับ git pull + docker compose
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket — สำหรับ rebuild containers
+      - ~/.ssh:/root/.ssh:ro                   # SSH key — สำหรับ git pull via SSH
     extra_hosts:
       - "host.docker.internal:host-gateway"   # ให้ container เห็น Ollama บน host
     depends_on:

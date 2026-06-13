@@ -1,4 +1,8 @@
+import asyncio
+import json
+
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.db import get_db
@@ -69,6 +73,61 @@ async def delete_user(
 async def service_health(db: AsyncSession = Depends(get_db), _: dict = _admin):
     settings = await service.get_settings_merged(db)
     return await service.check_health(settings)
+
+
+@router.get("/system/update/stream")
+async def stream_system_update(current_user: dict = Depends(require_role(Role.ADMIN))):
+    """Stream git pull + docker rebuild + restart output to frontend via SSE."""
+
+    def evt(data: dict) -> str:
+        return f"data: {json.dumps(data)}\n\n"
+
+    async def run(cmd: list[str]) -> tuple[asyncio.subprocess.Process, list[str]]:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        return proc
+
+    async def generate():
+        # ── Phase 1: git pull ───────────────────────────────────────────────
+        yield evt({"line": "📦 Pulling latest code from GitHub..."})
+        proc = await run(["git", "-C", "/repo", "pull", "origin", "main"])
+        async for raw in proc.stdout:
+            yield evt({"line": raw.decode().rstrip()})
+        await proc.wait()
+        if proc.returncode != 0:
+            yield evt({"line": f"❌ git pull failed (exit {proc.returncode})", "error": True})
+            return
+
+        # ── Phase 2: build images ───────────────────────────────────────────
+        yield evt({"line": "🔨 Building updated images (this may take a few minutes)..."})
+        proc2 = await run([
+            "docker-compose", "-f", "/repo/docker-compose.dev.yml",
+            "build", "--no-cache", "api", "frontend", "worker", "beat",
+        ])
+        async for raw in proc2.stdout:
+            yield evt({"line": raw.decode().rstrip()})
+        await proc2.wait()
+        if proc2.returncode != 0:
+            yield evt({"line": f"❌ Build failed (exit {proc2.returncode})", "error": True})
+            return
+
+        # ── Phase 3: restart (API will go offline) ─────────────────────────
+        yield evt({"line": "🔄 Restarting services... API will go offline in a moment.", "restarting": True})
+        await asyncio.create_subprocess_exec(
+            "docker-compose", "-f", "/repo/docker-compose.dev.yml",
+            "up", "-d", "--no-build",
+        )
+        await asyncio.sleep(3)
+        yield evt({"line": "__RESTARTING__", "restarting": True})
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/logs", response_model=list[LogEntry])
