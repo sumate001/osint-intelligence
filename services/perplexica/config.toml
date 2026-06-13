@@ -1,0 +1,13 @@
+[GENERAL]
+PORT = 3001
+SIMILARITY_MEASURE = "cosine"
+KEEP_ALIVE = "5m"
+
+[API_KEYS]
+OPENAI = ""
+GROQ = ""
+ANTHROPIC = ""
+
+[API_ENDPOINTS]
+SEARXNG = "http://searxng:8080"
+OLLAMA = "http://host.docker.internal:11434"

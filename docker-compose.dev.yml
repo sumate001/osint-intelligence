@@ -101,6 +101,35 @@ services:
       SEARXNG_BASE_URL: http://localhost:8080/
     restart: unless-stopped
 
+  perplexica-backend:
+    build:
+      context: https://github.com/ItzCrazyKns/Perplexica.git
+      dockerfile: app.dockerfile
+    container_name: osint-perplexica-backend
+    ports:
+      - "3001:3001"                              # Perplexica API + WebSocket
+    volumes:
+      - ./services/perplexica/config.toml:/home/perplexica/config.toml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - searxng
+    restart: unless-stopped
+
+  perplexica-frontend:
+    build:
+      context: https://github.com/ItzCrazyKns/Perplexica.git
+      dockerfile: ui.dockerfile
+    container_name: osint-perplexica-frontend
+    ports:
+      - "3002:3000"                              # 3000 ถูก OSINT frontend ใช้แล้ว → map ไป 3002
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXT_PUBLIC_WS_URL=ws://localhost:3001
+    depends_on:
+      - perplexica-backend
+    restart: unless-stopped
+
   api:
     build:
       context: ./services/api
@@ -113,7 +142,7 @@ services:
       - ./services/api:/app
       - ./:/repo                               # repo root — สำหรับ git pull + docker compose
       - /var/run/docker.sock:/var/run/docker.sock  # Docker socket — สำหรับ rebuild containers
-      - ~/.ssh:/root/.ssh:ro                   # SSH key — สำหรับ git pull via SSH
+      - ${HOME}/.ssh:/root/.ssh:ro              # SSH key — สำหรับ git pull via SSH
     extra_hosts:
       - "host.docker.internal:host-gateway"   # ให้ container เห็น Ollama บน host
     depends_on:
@@ -170,7 +199,7 @@ services:
       INTERNAL_API_URL: http://api:8000          # server-side → Docker network
       INTERNAL_SEARXNG_URL: http://searxng:8080  # server-side → Docker network
       NEXT_PUBLIC_API_URL: http://localhost:8000  # kept for SSR fallback
-      # NEXT_PUBLIC_PERPLEXICA_URL: http://localhost:3001  # uncomment when Perplexica is running
+      NEXT_PUBLIC_PERPLEXICA_URL: http://localhost:3002    # Perplexica UI (port 3002)
     depends_on:
       - api
     command: pnpm dev
