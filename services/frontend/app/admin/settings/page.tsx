@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAdminSettings, useSaveSettings, useAdminUsers, useCreateUser, useUpdateUser, useDeleteUser, useServiceHealth, useSystemLogs, useSystemVersion, useCheckForUpdates } from "@/lib/hooks/useAdmin";
 import { Topbar } from "@/components/layout/Topbar";
@@ -1034,15 +1035,21 @@ function LogsSection() {
 }
 
 // ─── MAIN PAGE ───────────────────────────────────────────────────────────────
-export default function AdminSettingsPage() {
+function AdminSettingsInner() {
   const { data: remote, isLoading } = useAdminSettings();
   const save = useSaveSettings();
   const t = useT();
+  const searchParams = useSearchParams();
 
   // local draft per section
   const [draft, setDraft] = useState<Partial<AdminSettings>>({});
   const [savedTab, setSavedTab] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>("ai");
+
+  const validTabIds = TABS.map(t => t.id) as string[];
+  const tabFromUrl = searchParams.get("tab") ?? "";
+  const [activeTab, setActiveTab] = useState<TabId>(
+    validTabIds.includes(tabFromUrl) ? (tabFromUrl as TabId) : "ai"
+  );
 
   useEffect(() => {
     if (remote && Object.keys(draft).length === 0) setDraft(remote);
@@ -1186,5 +1193,13 @@ export default function AdminSettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminSettingsInner />
+    </Suspense>
   );
 }

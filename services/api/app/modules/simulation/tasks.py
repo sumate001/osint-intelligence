@@ -29,7 +29,29 @@ def _session():
 
 @celery_app.task(name="simulation.run", bind=True, max_retries=2)
 def run_simulation(self, job_id: str) -> None:
-    asyncio.run(_run(job_id))
+    try:
+        asyncio.run(_run(job_id))
+    except Exception as exc:
+        log.error("Simulation task failed for job %s: %s", job_id, exc)
+        try:
+            asyncio.run(_mark_failed_sync(job_id, f"Worker error: {exc}"))
+        except Exception as e:
+            log.error("Cleanup after failure also failed for job %s: %s", job_id, e)
+
+
+async def _mark_failed_sync(job_id: str, reason: str) -> None:
+    from .models import SimulationJob
+    from sqlalchemy import select
+    SessionLocal = _session()
+    async with SessionLocal() as db:
+        job = (await db.execute(
+            select(SimulationJob).where(SimulationJob.id == job_id)
+        )).scalar_one_or_none()
+        if job and job.status in ("RUNNING", "PENDING"):
+            job.status = "FAILED"
+            job.error = reason
+            job.completed_at = datetime.now(timezone.utc)
+            await db.commit()
 
 
 async def _run(job_id: str) -> None:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/layout/Topbar";
 import { useFeedStats } from "@/lib/hooks/useFeedItems";
@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils/cn";
 import {
   Newspaper, Search, ShieldCheck, FileText, Zap,
   Globe, CheckCircle2, XCircle, AlertCircle, RefreshCw,
-  TrendingUp, Activity, Clock, ArrowRight,
-  LayoutDashboard, Cpu, Database,
+  TrendingUp, Activity, Clock, ArrowRight, ChevronDown,
+  Cpu, Database,
 } from "lucide-react";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -50,11 +50,16 @@ function StatChip({ label, value, color = "default", href }: StatChipProps) {
     default: "bg-[var(--surface-2)] border-[var(--border)]     text-[var(--text)]",
   };
   const inner = (
-    <div className={cn("flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors", colorMap[color], href && "hover:border-opacity-60 cursor-pointer")}>
+    <div className={cn(
+      "flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors",
+      colorMap[color],
+      href && "hover:opacity-80 cursor-pointer"
+    )}>
       <div>
         <p className="text-2xl font-bold font-mono leading-none">{value}</p>
         <p className="text-[10px] text-[var(--text-3)] mt-1 uppercase tracking-wide">{label}</p>
       </div>
+      {href && <ArrowRight size={12} className="ml-auto opacity-40" />}
     </div>
   );
   return href ? <Link href={href}>{inner}</Link> : inner;
@@ -100,25 +105,32 @@ function ModuleCard({ icon, label, href, metric, meta, accent = "var(--accent)",
   );
 }
 
-// ─── Service health compact ───────────────────────────────────────────────────
+// ─── Service row (clickable) ──────────────────────────────────────────────────
 
-function ServiceDot({ name, status }: { name: string; status: "ok" | "error" | "unknown" }) {
+function ServiceRow({ name, status, latency }: { name: string; status: "ok" | "error" | "unknown"; latency?: number | null }) {
   return (
-    <div className="flex items-center gap-2 py-1.5">
+    <Link
+      href="/admin/settings?tab=health"
+      className="flex items-center gap-2 py-1.5 hover:bg-[var(--surface-2)] -mx-4 px-4 rounded transition-colors group"
+    >
       {status === "ok"
         ? <CheckCircle2 size={12} className="text-[var(--green)] shrink-0" />
         : status === "error"
         ? <XCircle size={12} className="text-[var(--red)] shrink-0" />
         : <AlertCircle size={12} className="text-[var(--text-3)] shrink-0" />}
       <span className={cn(
-        "text-xs truncate",
+        "text-xs flex-1 truncate",
         status === "ok" ? "text-[var(--text-2)]" : status === "error" ? "text-[var(--red)]" : "text-[var(--text-3)]"
       )}>{name}</span>
-    </div>
+      {latency != null && (
+        <span className="text-[10px] font-mono text-[var(--text-3)]">{latency}ms</span>
+      )}
+      <ArrowRight size={10} className="text-[var(--text-3)] opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
+    </Link>
   );
 }
 
-// ─── Autopilot pipeline strip ─────────────────────────────────────────────────
+// ─── Autopilot pipeline strip (clickable) ────────────────────────────────────
 
 function AutopilotStrip({ enabled, steps, mode }: {
   enabled: boolean;
@@ -133,21 +145,27 @@ function AutopilotStrip({ enabled, steps, mode }: {
     { key: "auto_brief" as const,       short: "Brief" },
   ];
   return (
-    <div className={cn(
-      "rounded-xl border p-4",
-      enabled ? "border-[var(--yellow)]/40 bg-[var(--yellow)]/5" : "border-[var(--border)] bg-[var(--surface-2)]"
-    )}>
+    <Link
+      href="/admin/settings?tab=autopilot"
+      className={cn(
+        "block rounded-xl border p-4 transition-colors hover:border-opacity-80 group",
+        enabled ? "border-[var(--yellow)]/40 bg-[var(--yellow)]/5 hover:bg-[var(--yellow)]/8" : "border-[var(--border)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)]"
+      )}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Zap size={14} className={enabled ? "text-[var(--yellow)]" : "text-[var(--text-3)]"} />
           <span className="text-xs font-semibold text-[var(--text)]">Autopilot</span>
         </div>
-        <span className={cn(
-          "text-[10px] font-mono px-2 py-0.5 rounded font-bold",
-          enabled ? "bg-[var(--yellow)]/15 text-[var(--yellow)]" : "bg-[var(--surface-3)] text-[var(--text-3)]"
-        )}>
-          {enabled ? "ON" : "OFF"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={cn(
+            "text-[10px] font-mono px-2 py-0.5 rounded font-bold",
+            enabled ? "bg-[var(--yellow)]/15 text-[var(--yellow)]" : "bg-[var(--surface-3)] text-[var(--text-3)]"
+          )}>
+            {enabled ? "ON" : "OFF"}
+          </span>
+          <ArrowRight size={11} className="text-[var(--text-3)] opacity-0 group-hover:opacity-60 transition-opacity" />
+        </div>
       </div>
 
       {enabled && (
@@ -176,22 +194,58 @@ function AutopilotStrip({ enabled, steps, mode }: {
       )}
 
       {!enabled && (
-        <p className="text-[10px] text-[var(--text-3)]">
-          เปิด Autopilot ได้ใน{" "}
-          <Link href="/admin/settings" className="text-[var(--accent)] hover:underline">Admin → Autopilot</Link>
-        </p>
+        <p className="text-[10px] text-[var(--text-3)]">กดเพื่อตั้งค่า Autopilot →</p>
       )}
-    </div>
+    </Link>
   );
 }
 
-// ─── Level badge for logs ─────────────────────────────────────────────────────
+// ─── Activity log row (expandable) ───────────────────────────────────────────
 
-function LevelBadge({ level }: { level: string }) {
-  const cls = level === "ERROR" ? "text-[var(--red)]"
-    : level === "WARN" ? "text-[var(--yellow)]"
+function LogRow({ log, expanded, onToggle }: {
+  log: { id: number; timestamp: string; level: string; service: string; message: string; detail: Record<string, unknown> | null };
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const levelCls = log.level === "ERROR" ? "text-[var(--red)]"
+    : log.level === "WARN" ? "text-[var(--yellow)]"
     : "text-[var(--text-3)]";
-  return <span className={cn("text-[10px] font-mono font-bold w-10 shrink-0", cls)}>{level}</span>;
+
+  const hasDetail = log.detail && Object.keys(log.detail).length > 0;
+
+  return (
+    <div className={cn("border-b border-[var(--border)] last:border-0", expanded && "bg-[var(--surface-2)]")}>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-[var(--surface-2)] transition-colors text-left group"
+      >
+        <span className={cn("text-[10px] font-mono font-bold w-10 shrink-0 pt-0.5", levelCls)}>{log.level}</span>
+        <span className="text-[10px] text-[var(--text-3)] shrink-0 w-14 font-mono pt-0.5">{log.service}</span>
+        <span className="text-xs text-[var(--text-2)] flex-1 leading-relaxed text-left">{log.message}</span>
+        <span className="text-[10px] text-[var(--text-3)] shrink-0 font-mono">{relativeTime(log.timestamp)}</span>
+        {hasDetail && (
+          <ChevronDown size={12} className={cn(
+            "text-[var(--text-3)] shrink-0 transition-transform mt-0.5",
+            expanded ? "rotate-180" : "opacity-0 group-hover:opacity-100"
+          )} />
+        )}
+      </button>
+      {expanded && hasDetail && (
+        <div className="px-4 pb-3">
+          <pre className="text-[10px] font-mono text-[var(--text-2)] bg-[var(--surface-3)] rounded p-3 overflow-x-auto leading-relaxed">
+            {JSON.stringify(log.detail, null, 2)}
+          </pre>
+          <Link
+            href="/admin/settings?tab=logs"
+            className="inline-flex items-center gap-1 mt-2 text-[10px] text-[var(--accent)] hover:underline"
+            onClick={e => e.stopPropagation()}
+          >
+            ดู logs ทั้งหมด <ArrowRight size={9} />
+          </Link>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Dashboard page ───────────────────────────────────────────────────────────
@@ -205,11 +259,17 @@ export default function DashboardPage() {
   const { data: briefs = [] }  = useBriefs();
   const { data: sims = [] }    = useSimulations();
 
+  const [expandedLog, setExpandedLog] = useState<number | null>(null);
+
   const activeCases   = casesData?.total ?? 0;
   const servicesOk    = services.filter(s => s.status === "ok").length;
   const servicesTotal = services.length;
   const pendingBriefs = briefs.filter(b => b.status === "DRAFT" || b.status === "PENDING").length;
-  const runningSims   = sims.filter(s => s.status === "RUNNING" || s.status === "PENDING").length;
+  const STALE_MS = 30 * 60 * 1000;
+  const runningSims = sims.filter(s =>
+    (s.status === "RUNNING" || s.status === "PENDING") &&
+    Date.now() - new Date(s.created_at).getTime() < STALE_MS
+  ).length;
   const errorServices = services.filter(s => s.status === "error");
 
   const recentLogs = useMemo(() => logs.slice(0, 12), [logs]);
@@ -217,7 +277,6 @@ export default function DashboardPage() {
   const autopilot = settings?.automation;
   const autoEnabled = autopilot?.enabled ?? false;
 
-  // derive overall system status
   const systemStatus: "ok" | "warn" | "error" =
     errorServices.length >= 3 ? "error"
     : errorServices.length >= 1 ? "warn"
@@ -260,12 +319,13 @@ export default function DashboardPage() {
               label="Services"
               value={servicesTotal > 0 ? `${servicesOk}/${servicesTotal}` : "—"}
               color={systemStatus === "ok" ? "green" : systemStatus === "warn" ? "yellow" : "red"}
+              href="/admin/settings?tab=health"
             />
             <StatChip
               label="Autopilot"
               value={autoEnabled ? "ON" : "OFF"}
               color={autoEnabled ? "yellow" : "default"}
-              href="/admin/settings"
+              href="/admin/settings?tab=autopilot"
             />
           </div>
 
@@ -340,7 +400,12 @@ export default function DashboardPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-widest">Recent Activity</p>
-                  {healthLoading && <RefreshCw size={10} className="animate-spin text-[var(--text-3)]" />}
+                  <div className="flex items-center gap-2">
+                    {healthLoading && <RefreshCw size={10} className="animate-spin text-[var(--text-3)]" />}
+                    <Link href="/admin/settings?tab=logs" className="text-[10px] text-[var(--accent)] hover:underline">
+                      ดูทั้งหมด →
+                    </Link>
+                  </div>
                 </div>
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden">
                   {recentLogs.length === 0 ? (
@@ -349,14 +414,14 @@ export default function DashboardPage() {
                       <p className="text-xs">ไม่มี activity log</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-[var(--border)]">
+                    <div>
                       {recentLogs.map(log => (
-                        <div key={log.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-[var(--surface-2)] transition-colors">
-                          <LevelBadge level={log.level} />
-                          <span className="text-[10px] text-[var(--text-3)] shrink-0 w-14 font-mono">{log.service}</span>
-                          <span className="text-xs text-[var(--text-2)] flex-1 leading-relaxed">{log.message}</span>
-                          <span className="text-[10px] text-[var(--text-3)] shrink-0 font-mono">{relativeTime(log.timestamp)}</span>
-                        </div>
+                        <LogRow
+                          key={log.id}
+                          log={log}
+                          expanded={expandedLog === log.id}
+                          onToggle={() => setExpandedLog(prev => prev === log.id ? null : log.id)}
+                        />
                       ))}
                     </div>
                   )}
@@ -371,51 +436,52 @@ export default function DashboardPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-widest">Service Health</p>
-                  <Link href="/admin/settings" className="text-[10px] text-[var(--accent)] hover:underline">รายละเอียด →</Link>
+                  <Link href="/admin/settings?tab=health" className="text-[10px] text-[var(--accent)] hover:underline">รายละเอียด →</Link>
                 </div>
 
-                {/* Error banner */}
                 {errorServices.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-2 mb-3 bg-[var(--red)]/8 border border-[var(--red)]/30 rounded-lg text-xs text-[var(--red)]">
+                  <Link
+                    href="/admin/settings?tab=health"
+                    className="flex items-center gap-2 px-3 py-2 mb-3 bg-[var(--red)]/8 border border-[var(--red)]/30 rounded-lg text-xs text-[var(--red)] hover:bg-[var(--red)]/12 transition-colors"
+                  >
                     <AlertCircle size={12} />
-                    {errorServices.length} service ผิดพลาด
-                  </div>
+                    {errorServices.length} service ผิดพลาด — กดเพื่อดูรายละเอียด
+                    <ArrowRight size={11} className="ml-auto" />
+                  </Link>
                 )}
 
-                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-2 divide-y divide-[var(--border)]">
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-2">
                   {services.length === 0 ? (
                     <div className="py-6 text-center">
                       <RefreshCw size={14} className="animate-spin text-[var(--text-3)] mx-auto" />
                     </div>
                   ) : (
                     services.map(svc => (
-                      <div key={svc.name} className="flex items-center justify-between py-0.5">
-                        <ServiceDot name={svc.name} status={svc.status} />
-                        {svc.latency_ms != null && (
-                          <span className="text-[10px] font-mono text-[var(--text-3)]">{svc.latency_ms}ms</span>
-                        )}
-                      </div>
+                      <ServiceRow key={svc.name} name={svc.name} status={svc.status} latency={svc.latency_ms} />
                     ))
                   )}
                 </div>
 
-                {/* Summary chip */}
                 {services.length > 0 && (
-                  <div className={cn(
-                    "mt-2 flex items-center gap-2 px-3 py-2 rounded-lg text-xs border",
-                    systemStatus === "ok"
-                      ? "bg-[var(--green)]/8 border-[var(--green)]/30 text-[var(--green)]"
-                      : systemStatus === "warn"
-                      ? "bg-[var(--yellow)]/8 border-[var(--yellow)]/30 text-[var(--yellow)]"
-                      : "bg-[var(--red)]/8 border-[var(--red)]/30 text-[var(--red)]"
-                  )}>
+                  <Link
+                    href="/admin/settings?tab=health"
+                    className={cn(
+                      "mt-2 flex items-center gap-2 px-3 py-2 rounded-lg text-xs border transition-colors",
+                      systemStatus === "ok"
+                        ? "bg-[var(--green)]/8 border-[var(--green)]/30 text-[var(--green)] hover:bg-[var(--green)]/12"
+                        : systemStatus === "warn"
+                        ? "bg-[var(--yellow)]/8 border-[var(--yellow)]/30 text-[var(--yellow)] hover:bg-[var(--yellow)]/12"
+                        : "bg-[var(--red)]/8 border-[var(--red)]/30 text-[var(--red)] hover:bg-[var(--red)]/12"
+                    )}
+                  >
                     {systemStatus === "ok"
                       ? <><CheckCircle2 size={12} /> ระบบทำงานปกติ</>
                       : systemStatus === "warn"
                       ? <><AlertCircle size={12} /> บางส่วนมีปัญหา</>
                       : <><XCircle size={12} /> ระบบมีปัญหา</>}
                     <span className="ml-auto font-mono">{servicesOk}/{servicesTotal}</span>
-                  </div>
+                    <ArrowRight size={11} />
+                  </Link>
                 )}
               </div>
 
@@ -448,10 +514,11 @@ export default function DashboardPage() {
                 <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-widest mb-3">Quick Links</p>
                 <div className="space-y-1">
                   {[
-                    { href: "/admin/settings",        icon: <Cpu size={12} />,      label: "Admin Settings" },
-                    { href: "/admin/settings",        icon: <Database size={12} />, label: "Service Health" },
-                    { href: "/today",                 icon: <Clock size={12} />,    label: "Today's Intel" },
-                    { href: "/intelligence",          icon: <TrendingUp size={12}/>, label: "Intelligence" },
+                    { href: "/admin/settings?tab=ai",      icon: <Cpu size={12} />,       label: "AI Endpoints" },
+                    { href: "/admin/settings?tab=health",  icon: <Activity size={12} />,  label: "Service Health" },
+                    { href: "/admin/settings?tab=logs",    icon: <Database size={12} />,  label: "System Logs" },
+                    { href: "/today",                      icon: <Clock size={12} />,     label: "Today's Intel" },
+                    { href: "/intelligence",               icon: <TrendingUp size={12}/>, label: "Intelligence" },
                   ].map(item => (
                     <Link
                       key={item.href + item.label}

@@ -1,10 +1,12 @@
 import uuid
-from datetime import datetime, timezone
-from sqlalchemy import select
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import SimulationJob
 from .schemas import SimCreate
+
+STALE_AFTER_MINUTES = 30
 
 
 async def create_job(db: AsyncSession, data: SimCreate, user_id: str) -> SimulationJob:
@@ -28,6 +30,24 @@ async def get_job(db: AsyncSession, job_id: str) -> SimulationJob | None:
 
 
 async def list_jobs(db: AsyncSession, case_id: str | None = None) -> list[SimulationJob]:
+    # Expire jobs that are stuck in RUNNING/PENDING for longer than the stale threshold.
+    # This handles Celery worker crashes where the failure callback never fired.
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=STALE_AFTER_MINUTES)
+    await db.execute(
+        update(SimulationJob)
+        .where(
+            SimulationJob.status.in_(["RUNNING", "PENDING"]),
+            SimulationJob.created_at < stale_cutoff,
+            SimulationJob.completed_at.is_(None),
+        )
+        .values(
+            status="FAILED",
+            error=f"งานหมดเวลา — worker หยุดทำงานระหว่างประมวลผล (stale after {STALE_AFTER_MINUTES}m)",
+            completed_at=datetime.now(timezone.utc),
+        )
+    )
+    await db.commit()
+
     q = select(SimulationJob).order_by(SimulationJob.created_at.desc())
     if case_id:
         q = q.where(SimulationJob.case_id == case_id)
