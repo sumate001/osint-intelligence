@@ -18,7 +18,7 @@ class RSSAdapter(BaseAdapter):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.feed_url: str = config["feed_url"]
+        self.feed_url: str = config.get("feed_url") or config.get("url", "")
         self._seen_ids: set[str] = set()
 
     async def connect(self) -> bool:

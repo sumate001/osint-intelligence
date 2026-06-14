@@ -1,7 +1,10 @@
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from .models import DeceptionCheck
 from .schemas import DeceptionCheckCreate
+
+log = logging.getLogger(__name__)
 
 
 async def run_check(db: AsyncSession, data: DeceptionCheckCreate, user_id: str) -> DeceptionCheck:
@@ -31,14 +34,23 @@ async def run_check(db: AsyncSession, data: DeceptionCheckCreate, user_id: str) 
         ]
         parsed = await chat_json(messages, module="triage")
         if parsed:
-            check.cui_bono = parsed.get("cui_bono")
-            check.timing_analysis = parsed.get("timing_analysis")
-            check.source_motivation = parsed.get("source_motivation")
-            check.bot_indicators = parsed.get("bot_indicators", [])
-            check.risk_level = parsed.get("risk_level", "LOW")
+            # coerce to str — model sometimes returns booleans for text fields
+            def _s(v: object) -> str | None:
+                if v is None:
+                    return None
+                if isinstance(v, str):
+                    return v or None
+                return str(v)
+
+            check.cui_bono = _s(parsed.get("cui_bono"))
+            check.timing_analysis = _s(parsed.get("timing_analysis"))
+            check.source_motivation = _s(parsed.get("source_motivation"))
+            check.bot_indicators = parsed.get("bot_indicators") or []
+            check.risk_level = _s(parsed.get("risk_level")) or "LOW"
             check.flagged = bool(parsed.get("flagged"))
-            check.flag_reason = parsed.get("flag_reason")
-    except Exception:
+            check.flag_reason = _s(parsed.get("flag_reason"))
+    except Exception as exc:
+        log.error("Deception LLM failed for %s: %s", data.target_title[:40], exc)
         check.risk_level = "LOW"
 
     await db.flush()

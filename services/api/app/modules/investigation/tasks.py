@@ -116,10 +116,12 @@ async def _run_scan(scan_id: str) -> None:
                     await db2.commit()
 
             # Push entities to Neo4j
+            # SpiderFoot result array: [timestamp, data, value, module, confidence, risk, ...]
+            # index 10 = event type (e.g. ACCOUNT_EXTERNAL_OWNED), index 2 = entity value
             mapped = [
-                {"type": e[4], "value": e[2], "source": "spiderfoot"}
+                {"type": e[10] if len(e) > 10 else "Entity", "value": e[2], "source": "spiderfoot"}
                 for e in entities
-                if isinstance(e, list) and len(e) > 4
+                if isinstance(e, list) and len(e) > 2 and e[2]
             ]
             await upsert_entities(str(scan.case_id), mapped)
 
