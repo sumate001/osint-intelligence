@@ -85,6 +85,23 @@ export interface NotificationAlerts {
 }
 export interface NotificationSettings { check_interval_minutes: number; alerts: NotificationAlerts; }
 
+export interface AutomationSteps {
+  auto_triage: boolean;
+  auto_investigate: boolean;
+  auto_scan: boolean;
+  auto_verify: boolean;
+  auto_brief: boolean;
+}
+export interface AutomationSettings {
+  enabled: boolean;
+  decision_mode: "rule" | "llm" | "workflow";
+  n8n_workflow_id: string;
+  min_score: number;
+  steps: AutomationSteps;
+  require_human_review_for_brief: boolean;
+  max_cases_per_hour: number;
+}
+
 export interface AdminSettings {
   ai: AISettings;
   model_routing: ModelRoutingSettings;
@@ -97,6 +114,7 @@ export interface AdminSettings {
   storage: StorageSettings;
   n8n: N8nSettings;
   notifications: NotificationSettings;
+  automation: AutomationSettings;
 }
 export type SettingsPatch = Partial<AdminSettings>;
 

@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // 3d-force-graph and its Three.js deps ship as ESM — transpile so webpack can bundle them
+  transpilePackages: ["3d-force-graph", "three-forcegraph", "three-render-objects", "three"],
   async rewrites() {
     return [
       {

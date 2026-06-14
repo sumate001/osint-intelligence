@@ -105,6 +105,24 @@ class NotificationSettings(BaseModel):
     alerts: NotificationAlerts = NotificationAlerts()
 
 
+class AutomationSteps(BaseModel):
+    auto_triage: bool = True       # score incoming feed items
+    auto_investigate: bool = True  # open investigation case when score ≥ min_score
+    auto_scan: bool = True         # trigger SpiderFoot scan when case is created
+    auto_verify: bool = False      # run UGC verify on media attachments
+    auto_brief: bool = False       # generate brief draft after scan completes
+
+
+class AutomationSettings(BaseModel):
+    enabled: bool = False                        # master switch — default OFF
+    decision_mode: str = "rule"                  # "rule" | "llm" | "workflow"
+    n8n_workflow_id: str = ""                    # n8n workflow ID (when decision_mode = "workflow")
+    min_score: int = 15                          # minimum triage score to trigger pipeline
+    steps: AutomationSteps = AutomationSteps()
+    require_human_review_for_brief: bool = True  # human must approve before publishing
+    max_cases_per_hour: int = 10                 # rate-limit auto case creation
+
+
 class AllSettings(BaseModel):
     ai: AISettings = AISettings()
     model_routing: ModelRoutingSettings = ModelRoutingSettings()
@@ -117,6 +135,7 @@ class AllSettings(BaseModel):
     storage: StorageSettings = StorageSettings()
     n8n: N8nSettings = N8nSettings()
     notifications: NotificationSettings = NotificationSettings()
+    automation: AutomationSettings = AutomationSettings()
 
 
 class SettingsPatch(BaseModel):
@@ -131,6 +150,7 @@ class SettingsPatch(BaseModel):
     storage: StorageSettings | None = None
     n8n: N8nSettings | None = None
     notifications: NotificationSettings | None = None
+    automation: AutomationSettings | None = None
 
 
 class UserOut(BaseModel):

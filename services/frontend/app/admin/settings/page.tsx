@@ -6,7 +6,7 @@ import { useAdminSettings, useSaveSettings, useAdminUsers, useCreateUser, useUpd
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils/cn";
 import type { AdminSettings, SettingsPatch, AdminUser, UserCreate } from "@/lib/api/admin";
-import { Save, RefreshCw, Plus, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle, Download, Eye, EyeOff, ExternalLink, Globe } from "lucide-react";
+import { Save, RefreshCw, Plus, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle, Download, Eye, EyeOff, ExternalLink, Globe, Zap, ChevronRight } from "lucide-react";
 import { useT } from "@/lib/hooks/useT";
 import { useLocaleStore } from "@/lib/stores/locale";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n";
@@ -111,6 +111,7 @@ const TABS = [
   { id: "storage",       icon: "📦", label: "Storage & Cache" },
   { id: "n8n",           icon: "⚡", label: "n8n Automation" },
   { id: "notifications", icon: "🔔", label: "Notifications" },
+  { id: "autopilot",    icon: "⚡", label: "Autopilot" },
   { id: "adapters",      icon: "📡", label: "Adapters / Sources", href: "/admin/settings/adapters" },
   { id: "users",         icon: "👥", label: "Users" },
   { id: "roles",         icon: "🔑", label: "Roles & Permissions" },
@@ -466,6 +467,179 @@ function NotificationsSection({ s, set }: { s: AdminSettings["notifications"]; s
               </label>
             </Row>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SECTION: Autopilot ──────────────────────────────────────────────────────
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="relative inline-flex items-center cursor-pointer">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only peer" />
+      <div className="w-9 h-5 bg-[var(--border-2)] rounded-full peer
+        peer-checked:after:translate-x-full peer-checked:bg-[var(--accent)]
+        after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+        after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+    </label>
+  );
+}
+
+function AutomationSection({ s, set }: { s: AdminSettings["automation"]; set: (v: AdminSettings["automation"]) => void }) {
+  const PIPELINE_STEPS: { key: keyof typeof s.steps; label: string; note: string }[] = [
+    { key: "auto_triage",      label: "ประเมิน (Triage)",      note: "ให้คะแนน feed ที่เข้ามาอัตโนมัติ" },
+    { key: "auto_investigate", label: "เปิด Case",             note: "สร้าง Investigation case เมื่อคะแนนถึง min_score" },
+    { key: "auto_scan",        label: "สแกน (SpiderFoot)",     note: "เริ่ม OSINT scan ทันทีที่เปิด case" },
+    { key: "auto_verify",      label: "ตรวจสอบ UGC",          note: "รัน verify สำหรับไฟล์สื่อที่แนบมา" },
+    { key: "auto_brief",       label: "สร้าง Brief",           note: "ร่าง brief อัตโนมัติหลัง scan เสร็จ" },
+  ];
+
+  return (
+    <div className="space-y-8">
+      {/* Master toggle */}
+      <div className={cn(
+        "rounded-xl border-2 p-5 transition-colors",
+        s.enabled
+          ? "border-[var(--yellow)] bg-[var(--yellow)]/5"
+          : "border-[var(--border)] bg-[var(--surface-2)]"
+      )}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-base font-semibold text-[var(--text)] flex items-center gap-2">
+              <Zap size={16} className={s.enabled ? "text-[var(--yellow)]" : "text-[var(--text-3)]"} />
+              ระบบ Autopilot
+            </p>
+            <p className="text-xs text-[var(--text-3)] mt-0.5">
+              ให้ระบบทำงานโดยอัตโนมัติตั้งแต่ต้นจนจบ
+            </p>
+          </div>
+          <Toggle checked={s.enabled} onChange={v => set({ ...s, enabled: v })} />
+        </div>
+        {s.enabled && (
+          <div className="mt-4 flex items-start gap-2 text-xs text-[var(--yellow)] bg-[var(--yellow)]/10 rounded-lg p-3 border border-[var(--yellow)]/30">
+            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+            <span>Autopilot เปิดอยู่ — ระบบจะดำเนินการตามขั้นตอนที่เปิดไว้โดยอัตโนมัติ โดยไม่ต้องรอการอนุมัติจากผู้ใช้</span>
+          </div>
+        )}
+      </div>
+
+      {/* Pipeline stages */}
+      <div>
+        <p className={sectionTitle}>ขั้นตอน Pipeline</p>
+        <p className="text-xs text-[var(--text-3)] mb-4">กำหนดว่าขั้นตอนใดให้ทำงานอัตโนมัติ</p>
+        <div className="flex items-stretch gap-0">
+          {PIPELINE_STEPS.map((step, i) => (
+            <div key={step.key} className="flex items-center flex-1 min-w-0">
+              <div className={cn(
+                "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-colors min-w-0",
+                s.steps[step.key]
+                  ? "border-[var(--accent)]/50 bg-[var(--accent)]/8"
+                  : "border-[var(--border)] bg-[var(--surface-2)]"
+              )}>
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                  s.steps[step.key] ? "bg-[var(--accent)] text-white" : "bg-[var(--surface-3)] text-[var(--text-3)]"
+                )}>
+                  {i + 1}
+                </div>
+                <p className="text-[11px] font-medium text-[var(--text)] text-center leading-tight">{step.label}</p>
+                <p className="text-[9px] text-[var(--text-3)] text-center leading-tight hidden lg:block">{step.note}</p>
+                <Toggle
+                  checked={s.steps[step.key]}
+                  onChange={v => set({ ...s, steps: { ...s.steps, [step.key]: v } })}
+                />
+              </div>
+              {i < PIPELINE_STEPS.length - 1 && (
+                <ChevronRight size={14} className={cn(
+                  "shrink-0 mx-1",
+                  s.steps[step.key] && s.steps[PIPELINE_STEPS[i + 1].key]
+                    ? "text-[var(--accent)]" : "text-[var(--border-2)]"
+                )} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={divider} />
+
+      {/* Decision engine */}
+      <div>
+        <p className={sectionTitle}>Decision Engine</p>
+        <p className="text-xs text-[var(--text-3)] mb-4">วิธีที่ระบบใช้ตัดสินใจในแต่ละขั้นตอน</p>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {([
+            { value: "rule", label: "Rule-based", icon: "⚖️", note: "ใช้ threshold คะแนนจาก Triage Weights" },
+            { value: "llm",  label: "LLM",        icon: "🧠", note: "ให้ AI ตัดสินใจในแต่ละขั้นตอน" },
+            { value: "workflow", label: "n8n Workflow", icon: "🔀", note: "ใช้ workflow ที่กำหนดใน n8n" },
+          ] as const).map(opt => (
+            <label key={opt.value} className={cn(
+              "flex flex-col gap-1.5 p-4 rounded-xl border cursor-pointer transition-colors",
+              s.decision_mode === opt.value
+                ? "border-[var(--accent)] bg-[var(--accent)]/8"
+                : "border-[var(--border)] bg-[var(--surface-2)] hover:border-[var(--border-2)]"
+            )}>
+              <input type="radio" name="decision_mode" value={opt.value}
+                checked={s.decision_mode === opt.value}
+                onChange={() => set({ ...s, decision_mode: opt.value })}
+                className="sr-only" />
+              <span className="text-xl">{opt.icon}</span>
+              <span className="text-sm font-medium text-[var(--text)]">{opt.label}</span>
+              <span className="text-[10px] text-[var(--text-3)] leading-tight">{opt.note}</span>
+            </label>
+          ))}
+        </div>
+
+        {s.decision_mode === "workflow" && (
+          <Field label="n8n Workflow ID" note="ID ของ workflow ใน n8n ที่จะถูกเรียกเมื่อมี event (เช่น feed_item_scored)">
+            <input
+              value={s.n8n_workflow_id}
+              onChange={e => set({ ...s, n8n_workflow_id: e.target.value })}
+              className={inputCls}
+              placeholder="workflow-id-from-n8n"
+            />
+          </Field>
+        )}
+      </div>
+
+      <div className={divider} />
+
+      {/* Safety guards */}
+      <div>
+        <p className={sectionTitle}>Safety Guards</p>
+        <div className="space-y-1">
+          <Row
+            label="คะแนนขั้นต่ำ (min_score)"
+            note="เฉพาะ item ที่ได้คะแนน Triage ≥ ค่านี้จะผ่านไปยังขั้นต่อไป"
+          >
+            <input
+              type="number" min={1} max={99}
+              value={s.min_score}
+              onChange={e => set({ ...s, min_score: +e.target.value })}
+              className="w-20 bg-[var(--surface-2)] border border-[var(--border)] rounded px-3 py-1.5 text-sm text-[var(--text)] text-center font-mono focus:outline-none focus:border-[var(--accent)]"
+            />
+          </Row>
+          <Row
+            label="สูงสุดต่อชั่วโมง"
+            note="จำกัดจำนวน case ที่ระบบสร้างอัตโนมัติต่อชั่วโมง"
+          >
+            <input
+              type="number" min={1} max={100}
+              value={s.max_cases_per_hour}
+              onChange={e => set({ ...s, max_cases_per_hour: +e.target.value })}
+              className="w-20 bg-[var(--surface-2)] border border-[var(--border)] rounded px-3 py-1.5 text-sm text-[var(--text)] text-center font-mono focus:outline-none focus:border-[var(--accent)]"
+            />
+          </Row>
+          <Row
+            label="ต้องให้คนอนุมัติ Brief"
+            note="ร่าง brief จะรอการตรวจสอบก่อนเผยแพร่ (แนะนำให้เปิดไว้เสมอ)"
+          >
+            <Toggle
+              checked={s.require_human_review_for_brief}
+              onChange={v => set({ ...s, require_human_review_for_brief: v })}
+            />
+          </Row>
         </div>
       </div>
     </div>
@@ -889,7 +1063,8 @@ export default function AdminSettingsPage() {
   const tabSectionMap: Partial<Record<TabId, keyof AdminSettings>> = {
     "ai": "ai", "model-routing": "model_routing", "triage": "triage",
     "searxng": "searxng", "tools": "spiderfoot",
-    "databases": "databases", "storage": "storage", "n8n": "n8n", "notifications": "notifications",
+    "databases": "databases", "storage": "storage", "n8n": "n8n",
+    "notifications": "notifications", "autopilot": "automation",
   };
 
   const currentSection = tabSectionMap[activeTab];
@@ -994,6 +1169,12 @@ export default function AdminSettingsPage() {
               <>
                 <NotificationsSection s={s.notifications} set={setSection("notifications")} />
                 <SaveBar onSave={() => handleSave("notifications")} saving={save.isPending} saved={saved} />
+              </>
+            )}
+            {activeTab === "autopilot" && s.automation && (
+              <>
+                <AutomationSection s={s.automation} set={setSection("automation")} />
+                <SaveBar onSave={() => handleSave("automation")} saving={save.isPending} saved={saved} />
               </>
             )}
             {activeTab === "users" && <UsersSection />}

@@ -7,6 +7,7 @@ import { useLocaleStore } from "@/lib/stores/locale";
 import { useT } from "@/lib/hooks/useT";
 import { cn } from "@/lib/utils/cn";
 import {
+  LayoutDashboard,
   Newspaper,
   Search,
   ShieldCheck,
@@ -32,6 +33,7 @@ export function Sidebar() {
   const t = useT();
 
   const NAV_ITEMS = [
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: t("nav.today"), href: "/today", icon: Newspaper },
     { label: t("nav.investigation"), href: "/investigation", icon: Search },
     { label: t("nav.verify"), href: "/verify", icon: ShieldCheck },

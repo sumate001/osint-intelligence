@@ -244,6 +244,7 @@ export default function CasePage() {
               <ResearchPanel
                 perplexicaUrl={perplexicaUrl}
                 caseTitle={caseData.title}
+                caseId={caseId}
               />
             )}
             {sidePanel === "scans" && (

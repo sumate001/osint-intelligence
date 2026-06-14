@@ -29,7 +29,7 @@ const config: Config = {
         "darkweb-s": "var(--darkweb-s)",
       },
       fontFamily: {
-        thai: ["Noto Sans Thai", "Inter", "sans-serif"],
+        thai: ["Sarabun", "sans-serif"],
         mono: ["IBM Plex Mono", "monospace"],
       },
     },
