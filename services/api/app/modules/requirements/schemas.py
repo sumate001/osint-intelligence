@@ -7,6 +7,7 @@ class EEI(BaseModel):
     id: str
     question: str
     answered: bool = False
+    answer: str | None = None
 
 
 class PIRCreate(BaseModel):

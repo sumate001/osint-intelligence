@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, CheckCircle2, Clock, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, ChevronDown, ChevronUp, Pencil, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { usePIRs, useCreatePIR, useUpdatePIR, useDeletePIR } from "@/lib/hooks/useIntelligence";
 import type { PIR, EEI, PIRPriority } from "@/lib/types/intelligence";
@@ -12,16 +12,103 @@ const PRIORITY_STYLES: Record<PIRPriority, string> = {
   P3: "text-[var(--text-3)] bg-[var(--surface-3)]",
 };
 
+function EEIRow({ eei, onSave }: { eei: EEI; onSave: (updated: EEI) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(eei.answer ?? "");
+
+  const save = () => {
+    const trimmed = draft.trim();
+    onSave({ ...eei, answer: trimmed || null, answered: trimmed.length > 0 });
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setDraft(eei.answer ?? "");
+    setEditing(false);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-start gap-2">
+        <div className={cn(
+          "shrink-0 mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center",
+          eei.answered ? "bg-[var(--green)] border-[var(--green)]" : "border-[var(--border-2)]"
+        )}>
+          {eei.answered && <CheckCircle2 size={9} className="text-white" />}
+        </div>
+        <p className={cn("flex-1 text-xs leading-snug", eei.answered ? "text-[var(--text-2)]" : "text-[var(--text-2)]")}>
+          {eei.question}
+        </p>
+        <button
+          onClick={() => setEditing((v) => !v)}
+          className="shrink-0 text-[var(--text-3)] hover:text-[var(--accent)]"
+          title="บันทึกคำตอบ"
+        >
+          <Pencil size={11} />
+        </button>
+      </div>
+
+      {/* Answer display */}
+      {!editing && eei.answer && (
+        <div className="ml-5 px-2.5 py-1.5 bg-[var(--surface-2)] border-l-2 border-[var(--green)] rounded-r text-xs text-[var(--text)] leading-relaxed">
+          {eei.answer}
+        </div>
+      )}
+      {!editing && !eei.answer && (
+        <p
+          className="ml-5 text-[10px] text-[var(--text-3)] cursor-pointer hover:text-[var(--accent)]"
+          onClick={() => setEditing(true)}
+        >
+          + เพิ่มคำตอบ
+        </p>
+      )}
+
+      {/* Inline editor */}
+      {editing && (
+        <div className="ml-5 space-y-1.5">
+          <textarea
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="บันทึกคำตอบ EEI นี้..."
+            rows={3}
+            className="w-full bg-[var(--surface-2)] border border-[var(--border-2)] rounded px-2.5 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--text-3)] outline-none resize-none focus:border-[var(--accent)]"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={save}
+              className="flex items-center gap-1 bg-[var(--green)] text-white text-[10px] px-2.5 py-1 rounded hover:opacity-90"
+            >
+              <Check size={10} /> บันทึก
+            </button>
+            <button
+              onClick={cancel}
+              className="flex items-center gap-1 text-[var(--text-3)] hover:text-[var(--text-2)] text-[10px] px-2 py-1"
+            >
+              <X size={10} /> ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PIRCard({ pir }: { pir: PIR }) {
   const [expanded, setExpanded] = useState(false);
   const updatePIR = useUpdatePIR();
   const deletePIR = useDeletePIR();
 
-  const toggleEEI = (eeiId: string) => {
-    const updated = pir.eei_list.map((e) =>
-      e.id === eeiId ? { ...e, answered: !e.answered } : e
-    );
-    updatePIR.mutate({ id: pir.id, data: { eei_list: updated } });
+  const saveEEI = (updated: EEI) => {
+    const newList = pir.eei_list.map((e) => (e.id === updated.id ? updated : e));
+    const allAnswered = newList.every((e) => e.answered);
+    updatePIR.mutate({
+      id: pir.id,
+      data: {
+        eei_list: newList,
+        ...(allAnswered && pir.status === "ACTIVE" ? { status: "ANSWERED" } : {}),
+      },
+    });
   };
 
   const markAnswered = () => updatePIR.mutate({ id: pir.id, data: { status: "ANSWERED" } });
@@ -77,24 +164,10 @@ function PIRCard({ pir }: { pir: PIR }) {
 
       {/* EEI list */}
       {expanded && pir.eei_list.length > 0 && (
-        <div className="space-y-1.5 pt-1 border-t border-[var(--border)]">
+        <div className="space-y-3 pt-2 border-t border-[var(--border)]">
           <p className="text-[9px] font-mono text-[var(--text-3)] tracking-widest">ESSENTIAL ELEMENTS OF INFORMATION</p>
           {pir.eei_list.map((eei) => (
-            <button
-              key={eei.id}
-              onClick={() => toggleEEI(eei.id)}
-              className="flex items-start gap-2 w-full text-left group"
-            >
-              <div className={cn(
-                "shrink-0 mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center",
-                eei.answered ? "bg-[var(--green)] border-[var(--green)]" : "border-[var(--border-2)]"
-              )}>
-                {eei.answered && <CheckCircle2 size={9} className="text-white" />}
-              </div>
-              <p className={cn("text-xs leading-snug", eei.answered ? "line-through text-[var(--text-3)]" : "text-[var(--text-2)]")}>
-                {eei.question}
-              </p>
-            </button>
+            <EEIRow key={eei.id} eei={eei} onSave={saveEEI} />
           ))}
         </div>
       )}

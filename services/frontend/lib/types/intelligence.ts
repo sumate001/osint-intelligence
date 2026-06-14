@@ -6,6 +6,7 @@ export interface EEI {
   id: string;
   question: string;
   answered: boolean;
+  answer?: string | null;
 }
 
 export interface PIR {
