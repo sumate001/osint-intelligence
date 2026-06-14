@@ -36,7 +36,7 @@ script จะถามรหัสผ่านสำหรับ PostgreSQL, Neo
 จากนั้นทำทุกอย่างอัตโนมัติ: build images → ขึ้น services → migrate DB → seed admin → ตรวจสอบ integration
 
 เมื่อเสร็จ เปิดเบราว์เซอร์:
-- **UI** → `http://localhost:3000`
+- **UI** → `http://localhost` (ผ่าน nginx port 80)
 - **API Docs** → `http://localhost:8000/docs`
 
 **Login:** `admin@osintdesk.local` / รหัสผ่านที่กรอกตอน `./deploy.sh`

@@ -1,6 +1,9 @@
 """Celery tasks: run full verification pipeline on uploaded media."""
 import asyncio
+import base64
+import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -10,13 +13,18 @@ from .service import (
     extract_exif_from_bytes,
     extract_gps,
     extract_audio_bytes,
-    extract_keyframes,
+    get_video_duration,
+    parse_whisper_transcript,
+    extract_frame_at,
+    extract_evenly_spaced_frames,
     check_wayback,
     reverse_image_search,
     determine_verdict,
 )
 
 log = logging.getLogger(__name__)
+
+MAX_SHOTS = 5  # max frames to extract per video
 
 
 def _make_celery_session():
@@ -34,7 +42,7 @@ def run_verify_pipeline(self, job_id: str) -> None:
 async def _run_pipeline(job_id: str) -> None:
     from .models import VerifyJob
     from sqlalchemy import select
-    import httpx
+    from ...core.llm import transcribe_audio, analyze_image_b64, chat_completion as llm_chat
 
     SessionLocal = _make_celery_session()
     settings = get_settings()
@@ -45,90 +53,186 @@ async def _run_pipeline(job_id: str) -> None:
         ).scalar_one_or_none()
         if not job:
             return
-
         job.status = "PROCESSING"
         await db.commit()
 
     try:
-        # 1. Download file from MinIO for analysis
+        # ── 1. Download from MinIO ─────────────────────────────────────────────
         file_bytes = b""
         try:
             minio_endpoint = getattr(settings, "minio_endpoint", "") or ""
             minio_user = getattr(settings, "minio_user", "") or ""
             minio_password = getattr(settings, "minio_password", "") or ""
             if minio_endpoint and job.minio_key:
-                bucket, *key_parts = job.minio_key.split("/", 1)
-                key = key_parts[0] if key_parts else job.minio_key
-                url = f"http://{minio_endpoint}/{bucket}/{key}"
-                async with httpx.AsyncClient(timeout=30) as client:
-                    resp = await client.get(url, auth=(minio_user, minio_password))
-                    if resp.status_code == 200:
-                        file_bytes = resp.content
+                def _dl():
+                    from minio import Minio
+                    bucket, *kparts = job.minio_key.split("/", 1)
+                    obj_key = kparts[0] if kparts else job.minio_key
+                    c = Minio(minio_endpoint, access_key=minio_user, secret_key=minio_password, secure=False)
+                    return c.get_object(bucket, obj_key).read()
+                file_bytes = await asyncio.to_thread(_dl)
+                log.info("Downloaded %d bytes from MinIO for job %s", len(file_bytes), job_id)
         except Exception as exc:
-            log.warning("Could not download file from MinIO: %s", exc)
+            log.warning("MinIO download failed: %s", exc)
 
-        # 2. EXIF extraction
-        exif_data = {}
+        # ── 2. EXIF ────────────────────────────────────────────────────────────
+        exif_data: dict = {}
         gps_lat = gps_lon = gps_ts = None
         camera_make = camera_model = None
-
         if file_bytes:
             exif_data = extract_exif_from_bytes(file_bytes, job.filename)
             gps_lat, gps_lon, gps_ts = extract_gps(exif_data)
             camera_make = exif_data.get("Make")
             camera_model = exif_data.get("Model")
 
-        # 3. Video/audio: transcription + keyframe analysis
-        transcript: str | None = None
-        keyframe_descriptions: list[str] = []
+        # ── 3. Transcribe ──────────────────────────────────────────────────────
+        transcript: str | None = None          # clean text shown to analyst
+        transcript_segments: list[tuple[float, str]] = []  # (seconds, text)
 
         if job.file_type in ("video", "audio") and file_bytes:
-            import base64
-            from ...core.llm import transcribe_audio, analyze_image_b64
-
-            # Extract audio and transcribe with Whisper via Ollama
             audio = extract_audio_bytes(file_bytes) if job.file_type == "video" else file_bytes
             if audio:
-                log.info("Transcribing %s bytes of audio for job %s", len(audio), job_id)
-                transcript = await transcribe_audio(audio)
+                log.info("Transcribing %d bytes for job %s", len(audio), job_id)
+                raw = await transcribe_audio(audio)
+                if raw:
+                    transcript_segments = parse_whisper_transcript(raw)
+                    if transcript_segments:
+                        # Store clean text (no timestamp markers) in transcript field
+                        transcript = " ".join(t for _, t in transcript_segments)
+                        log.info("Parsed %d segments with timestamps for job %s",
+                                 len(transcript_segments), job_id)
+                    else:
+                        transcript = raw  # no timestamps — store as-is
+                        log.info("Transcript (no timestamps) for job %s", job_id)
 
-            # Extract keyframes and describe with vision model
-            if job.file_type == "video":
-                frames = extract_keyframes(file_bytes, max_frames=5)
-                log.info("Extracted %d keyframes for job %s", len(frames), job_id)
-                for frame_bytes in frames:
+        # ── 4. Shot selection + frame analysis (video only) ───────────────────
+        # KeyframeAnalysis: list of {ts, transcript_context, description}
+        keyframe_analysis: list[dict] = []
+
+        if job.file_type == "video" and file_bytes:
+            duration = await asyncio.to_thread(get_video_duration, file_bytes)
+            log.info("Video duration %.1fs for job %s", duration, job_id)
+
+            target_timestamps: list[float] = []
+
+            if transcript_segments:
+                # Ask LLM which moments are worth capturing (person, location, event)
+                ts_lines = "\n".join(
+                    f"[{ts:.1f}s] {text}" for ts, text in transcript_segments[:120]
+                )
+                shot_prompt = (
+                    f"คุณเป็นบรรณาธิการภาพข่าว วิดีโอความยาว {duration:.0f} วินาที "
+                    f"มี transcript ด้านล่าง เลือก {MAX_SHOTS} timestamp (วินาที) "
+                    "ที่ควรจับภาพเพื่อใช้ในการรายงานข่าว เน้น: บุคคลที่กำลังพูดหรือปรากฏตัว, "
+                    "สถานที่สำคัญ, เหตุการณ์สำคัญ, ป้าย/ข้อความในภาพ "
+                    "ตอบเป็น JSON array ของตัวเลขวินาที เท่านั้น ตัวอย่าง: [4.5, 18.2, 35.0]\n\n"
+                    f"{ts_lines}"
+                )
+                try:
+                    shot_result = await llm_chat(
+                        [{"role": "user", "content": shot_prompt}],
+                        module="default", timeout=60.0,
+                    )
+                    m = re.search(r'\[[\d.,\s]+\]', shot_result)
+                    if m:
+                        target_timestamps = [
+                            float(x) for x in json.loads(m.group())
+                            if 0 <= float(x) <= duration
+                        ][:MAX_SHOTS]
+                        log.info("LLM selected %d shots: %s", len(target_timestamps), target_timestamps)
+                except Exception as exc:
+                    log.warning("Shot selection failed, falling back to even sampling: %s", exc)
+
+            if not target_timestamps:
+                # No transcript or LLM failed — evenly-spaced fallback
+                log.info("Using evenly-spaced frame sampling for job %s", job_id)
+                pairs = await asyncio.to_thread(
+                    extract_evenly_spaced_frames, file_bytes, duration, MAX_SHOTS
+                )
+                for ts, frame_bytes in pairs:
                     frame_b64 = base64.b64encode(frame_bytes).decode()
                     desc = await analyze_image_b64(
                         frame_b64,
-                        "อธิบายสิ่งที่เห็นในภาพนี้อย่างละเอียด "
-                        "รวมถึงสถานที่ บุคคล กิจกรรม ป้ายหรือข้อความที่เห็น "
-                        "และสิ่งผิดปกติใดๆ ที่บ่งชี้การแก้ไขหรือ deepfake",
+                        "อธิบายสิ่งที่เห็นในภาพอย่างละเอียด: บุคคล สถานที่ กิจกรรม "
+                        "ป้ายหรือข้อความ และสิ่งผิดปกติที่อาจบ่งชี้การตัดต่อ",
                     )
-                    keyframe_descriptions.append(desc)
+                    if desc:
+                        keyframe_analysis.append({"ts": ts, "description": desc, "transcript_context": ""})
+            else:
+                # Extract and describe frames at LLM-selected timestamps
+                for ts in target_timestamps:
+                    frame_bytes = await asyncio.to_thread(extract_frame_at, file_bytes, ts)
+                    if not frame_bytes:
+                        log.warning("No frame at %.1fs for job %s", ts, job_id)
+                        continue
 
-        # 4. Wayback Machine check
+                    # Find transcript text closest to this timestamp
+                    ctx = ""
+                    if transcript_segments:
+                        closest = min(transcript_segments, key=lambda s: abs(s[0] - ts))
+                        ctx = closest[1]
+
+                    frame_b64 = base64.b64encode(frame_bytes).decode()
+                    desc = await analyze_image_b64(
+                        frame_b64,
+                        "อธิบายสิ่งที่เห็นในภาพอย่างละเอียด: บุคคล (ลักษณะ เพศ วัย เสื้อผ้า), "
+                        "สถานที่ สภาพแวดล้อม กิจกรรม ป้ายหรือข้อความที่เห็น "
+                        "และสิ่งผิดปกติที่อาจบ่งชี้การตัดต่อหรือ deepfake",
+                    )
+                    if desc:
+                        keyframe_analysis.append({
+                            "ts": round(ts, 1),
+                            "description": desc,
+                            "transcript_context": ctx,
+                        })
+                        log.info("Shot at %.1fs described for job %s", ts, job_id)
+
+        # ── 5. Wayback Machine check ───────────────────────────────────────────
         source_url = exif_data.get("SourceURL") or exif_data.get("Comment", "")
         wb_url, wb_first_seen = None, None
-        if source_url and source_url.startswith("http"):
-            wb_url, wb_first_seen = await check_wayback(source_url)
+        if source_url and str(source_url).startswith("http"):
+            wb_url, wb_first_seen = await check_wayback(str(source_url))
 
-        # 5. Reverse image search (images only)
+        # ── 6. Reverse image search (images only) ─────────────────────────────
         duplicate_hits: list[dict] = []
         if job.file_type == "image" and file_bytes:
             duplicate_hits = await reverse_image_search(file_bytes, job.filename)
 
-        # 6. Determine verdict
-        verdict, verdict_notes = determine_verdict(exif_data, gps_lat, wb_first_seen, len(duplicate_hits))
+        # ── 7. Verdict (rule-based) ────────────────────────────────────────────
+        verdict, rule_notes = determine_verdict(exif_data, gps_lat, wb_first_seen, len(duplicate_hits))
 
-        # Append video analysis summary to verdict notes
-        if transcript:
-            snippet = transcript[:300].replace("\n", " ")
-            verdict_notes += f"\nถอดเสียง: {snippet}{'...' if len(transcript) > 300 else ''}"
-        if keyframe_descriptions:
-            verdict_notes += f"\nkeyframes ({len(keyframe_descriptions)} เฟรม): " + \
-                " | ".join(d[:150] for d in keyframe_descriptions[:3])
+        # ── 8. Comprehensive media summary ────────────────────────────────────
+        verdict_notes = rule_notes
+        if transcript or keyframe_analysis:
+            summary_parts: list[str] = []
+            if transcript:
+                summary_parts.append(f"ถอดเสียง:\n{transcript}")
+            if keyframe_analysis:
+                shot_lines_list = []
+                for item in keyframe_analysis:
+                    ctx = item["transcript_context"]
+                    ctx_part = f'"{ctx}" → ' if ctx else ""
+                    shot_lines_list.append(f"- [{item['ts']}s] {ctx_part}{item['description']}")
+                shot_lines = "\n".join(shot_lines_list)
+                summary_parts.append(f"ภาพในวิดีโอ:\n{shot_lines}")
 
-        # 7. Save results
+            summary_prompt = (
+                "คุณเป็นผู้ตรวจสอบสื่อในงานข่าว สรุปเนื้อหาวิดีโอนี้สำหรับบรรณาธิการ "
+                "ระบุครบถ้วน: ใครปรากฏในภาพ / เกิดอะไรขึ้น / สถานที่และบริบท / "
+                "ประเด็นที่ต้องตรวจสอบเพิ่มเติม ไม่ต้องย่อให้สั้นเกินไป:\n\n"
+                + "\n\n".join(summary_parts)
+            )
+            try:
+                media_summary = await llm_chat(
+                    [{"role": "user", "content": summary_prompt}],
+                    module="default", timeout=120.0,
+                )
+                verdict_notes = media_summary + "\n\n---\n" + rule_notes
+                log.info("Media summary done for job %s", job_id)
+            except Exception as exc:
+                log.warning("Media summary failed: %s", exc)
+
+        # ── 9. Save results ────────────────────────────────────────────────────
         async with SessionLocal() as db:
             job2 = (
                 await db.execute(select(VerifyJob).where(VerifyJob.id == uuid.UUID(job_id)))
@@ -139,8 +243,8 @@ async def _run_pipeline(job_id: str) -> None:
                     k: str(v) for k, v in exif_data.items()
                     if k not in {"ThumbnailImage", "PreviewImage"}
                 }
-                if keyframe_descriptions:
-                    saved_exif["KeyframeDescriptions"] = keyframe_descriptions
+                if keyframe_analysis:
+                    saved_exif["KeyframeAnalysis"] = keyframe_analysis
                 job2.exif_data = saved_exif
                 job2.gps_lat = gps_lat
                 job2.gps_lon = gps_lon
@@ -157,7 +261,7 @@ async def _run_pipeline(job_id: str) -> None:
                 await db.commit()
 
     except Exception as exc:
-        log.error("Verify pipeline failed for %s: %s", job_id, exc)
+        log.error("Verify pipeline failed for %s: %s", job_id, exc, exc_info=True)
         async with SessionLocal() as db:
             job3 = (
                 await db.execute(select(VerifyJob).where(VerifyJob.id == uuid.UUID(job_id)))

@@ -111,32 +111,32 @@ async def reverse_image_search(image_bytes: bytes, filename: str) -> list[dict]:
     return []
 
 
-async def upload_to_minio(data: bytes, key: str, content_type: str) -> bool:
-    """Upload bytes to MinIO. Returns True on success."""
-    import httpx
+def _sync_upload_to_minio(data: bytes, key: str, content_type: str) -> bool:
+    """Sync MinIO SDK upload — run via asyncio.to_thread."""
+    from minio import Minio
     settings = get_settings()
-    minio_endpoint = getattr(settings, "minio_endpoint", "") or ""
-    minio_user = getattr(settings, "minio_user", "") or ""
-    minio_password = getattr(settings, "minio_password", "") or ""
-    if not minio_endpoint:
+    endpoint = getattr(settings, "minio_endpoint", "") or ""
+    user = getattr(settings, "minio_user", "") or ""
+    password = getattr(settings, "minio_password", "") or ""
+    if not endpoint:
         return False
     try:
         bucket, *key_parts = key.split("/", 1)
         obj_key = key_parts[0] if key_parts else key
-        async with httpx.AsyncClient(timeout=30) as client:
-            await client.put(
-                f"http://{minio_endpoint}/{bucket}",
-                auth=(minio_user, minio_password),
-            )
-            resp = await client.put(
-                f"http://{minio_endpoint}/{bucket}/{obj_key}",
-                content=data,
-                headers={"Content-Type": content_type},
-                auth=(minio_user, minio_password),
-            )
-            return resp.status_code in (200, 204)
-    except Exception:
+        client = Minio(endpoint, access_key=user, secret_key=password, secure=False)
+        if not client.bucket_exists(bucket):
+            client.make_bucket(bucket)
+        client.put_object(bucket, obj_key, io.BytesIO(data), len(data), content_type=content_type)
+        return True
+    except Exception as exc:
+        log.warning("MinIO upload failed: %s", exc)
         return False
+
+
+async def upload_to_minio(data: bytes, key: str, content_type: str) -> bool:
+    """Upload bytes to MinIO using the MinIO SDK (S3 Signature V4)."""
+    import asyncio
+    return await asyncio.to_thread(_sync_upload_to_minio, data, key, content_type)
 
 
 def extract_audio_bytes(video_bytes: bytes) -> bytes | None:
@@ -163,31 +163,75 @@ def extract_audio_bytes(video_bytes: bytes) -> bytes | None:
     return None
 
 
-def extract_keyframes(video_bytes: bytes, max_frames: int = 5) -> list[bytes]:
-    """Extract I-frames (keyframes) from video as JPEG bytes via ffmpeg."""
+def get_video_duration(video_bytes: bytes) -> float:
+    """Return video duration in seconds via ffprobe. Falls back to 60.0."""
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            input_path = f"{tmpdir}/input.mp4"
-            Path(input_path).write_bytes(video_bytes)
-            subprocess.run(
-                [
-                    "ffmpeg", "-i", input_path,
-                    "-vf", "select=eq(pict_type\\,I),scale=640:-1",
-                    "-vsync", "vfr",
-                    "-q:v", "5",
-                    f"{tmpdir}/frame_%04d.jpg",
-                ],
-                capture_output=True,
-                timeout=120,
-                check=False,
+            p = f"{tmpdir}/v"
+            Path(p).write_bytes(video_bytes)
+            r = subprocess.run(
+                ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+                 "-of", "csv=p=0", p],
+                capture_output=True, timeout=15, text=True, check=False,
             )
-            frames = []
-            for jpg in sorted(Path(tmpdir).glob("frame_*.jpg"))[:max_frames]:
-                frames.append(jpg.read_bytes())
-            return frames
+            return float(r.stdout.strip())
+    except Exception:
+        return 60.0
+
+
+def parse_whisper_transcript(raw: str) -> list[tuple[float, str]]:
+    """Parse Whisper output that contains SRT-style timestamps.
+    Returns list of (start_seconds, text). If no timestamps found, returns []."""
+    import re
+    segments = []
+    # [HH:MM:SS.ms --> ...] or [MM:SS.ms --> ...]
+    for m in re.finditer(
+        r'\[(\d+:\d+(?::\d+)?\.?\d*)\s*-->\s*[^\]]+\]\s*([^\[]+)', raw
+    ):
+        ts_raw, text = m.group(1), m.group(2).strip()
+        if not text:
+            continue
+        parts = ts_raw.split(":")
+        try:
+            if len(parts) == 2:
+                secs = float(parts[0]) * 60 + float(parts[1])
+            else:
+                secs = float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+            segments.append((secs, text))
+        except (ValueError, IndexError):
+            continue
+    return segments
+
+
+def extract_frame_at(video_bytes: bytes, timestamp: float) -> bytes | None:
+    """Extract one frame at the given timestamp (seconds) as JPEG bytes."""
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            inp = f"{tmpdir}/input.mp4"
+            out = f"{tmpdir}/frame.jpg"
+            Path(inp).write_bytes(video_bytes)
+            subprocess.run(
+                ["ffmpeg", "-y", "-ss", f"{timestamp:.2f}", "-i", inp,
+                 "-frames:v", "1", "-q:v", "3", "-vf", "scale=640:-1", out],
+                capture_output=True, timeout=30, check=False,
+            )
+            p = Path(out)
+            if p.exists() and p.stat().st_size > 1000:
+                return p.read_bytes()
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        log.warning("ffmpeg keyframe extract failed: %s", exc)
-    return []
+        log.warning("Frame at %.1fs failed: %s", timestamp, exc)
+    return None
+
+
+def extract_evenly_spaced_frames(video_bytes: bytes, duration: float, n: int = 5) -> list[tuple[float, bytes]]:
+    """Fallback: extract n evenly-spaced frames when no transcript timestamps available."""
+    results = []
+    for i in range(n):
+        t = duration * (0.05 + i * (0.90 / max(n - 1, 1))) if n > 1 else duration * 0.5
+        frame = extract_frame_at(video_bytes, t)
+        if frame:
+            results.append((round(t, 1), frame))
+    return results
 
 
 def determine_file_type(filename: str, content_type: str) -> str:

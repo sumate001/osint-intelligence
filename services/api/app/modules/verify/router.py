@@ -71,3 +71,18 @@ async def get_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+
+@router.delete("/jobs/{job_id}", status_code=204)
+async def delete_job(
+    job_id: uuid.UUID,
+    db=Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Cancel a pending/processing job or delete a completed one."""
+    from datetime import datetime, timezone
+    job = (await db.execute(select(VerifyJob).where(VerifyJob.id == job_id))).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    await db.delete(job)
+    await db.commit()

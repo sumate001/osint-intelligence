@@ -9,6 +9,10 @@ export function getVerifyJob(jobId: string) {
   return apiFetch<VerifyJob>(`/api/v1/verify/jobs/${jobId}`);
 }
 
+export function deleteVerifyJob(jobId: string) {
+  return apiFetch<void>(`/api/v1/verify/jobs/${jobId}`, { method: "DELETE" });
+}
+
 export async function uploadForVerify(file: File): Promise<VerifyJob> {
   const formData = new FormData();
   formData.append("file", file);

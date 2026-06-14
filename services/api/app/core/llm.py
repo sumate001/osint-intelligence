@@ -97,11 +97,15 @@ async def transcribe_audio(audio_bytes: bytes, model: str | None = None) -> str 
 
 
 async def analyze_image_b64(image_b64: str, prompt: str, model: str | None = None) -> str:
-    """Analyze a single image (base64 JPEG/PNG) with the vision model."""
+    """Analyze a single image (base64 JPEG/PNG) with the vision model. Returns empty string on failure."""
     settings = get_settings()
     resolved_model = model or getattr(settings, "vision_model", "gemma3:27b")
     messages = [{"role": "user", "content": prompt, "images": [image_b64]}]
-    return await chat_completion(messages, module="vision", model=resolved_model, timeout=120.0)
+    try:
+        return await chat_completion(messages, module="vision", model=resolved_model, timeout=120.0)
+    except Exception as exc:
+        log.warning("Vision analysis failed (%s): %s", resolved_model, exc)
+        return ""
 
 
 async def health_check() -> bool:
