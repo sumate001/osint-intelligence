@@ -123,7 +123,7 @@ async def _run_scan(scan_id: str) -> None:
                 for e in entities
                 if isinstance(e, list) and len(e) > 2 and e[2]
             ]
-            await upsert_entities(str(scan.case_id), mapped)
+            await upsert_entities(str(scan.case_id), mapped, scan_target=scan.target)
 
         except Exception as exc:
             log.error("SpiderFoot scan failed: %s", exc)

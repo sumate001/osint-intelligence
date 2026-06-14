@@ -27,7 +27,7 @@ async def get_case_graph(case_id: str) -> dict[str, list]:
             {
                 "statement": (
                     "MATCH (n)-[r]->(m) WHERE n.case_id = $case_id AND m.case_id = $case_id "
-                    "RETURN n, r, m LIMIT 200"
+                    "RETURN n, labels(n) AS nl, type(r) AS rel_type, id(r) AS rid, m, labels(m) AS ml LIMIT 200"
                 ),
                 "parameters": {"case_id": case_id},
             },
@@ -67,33 +67,39 @@ async def get_case_graph(case_id: str) -> dict[str, list]:
                     }
 
         # Second result: relationships
+        # RETURN n, labels(n), type(r), id(r), m, labels(m)
+        # row    = [n_dict, [labels], rel_type_str, rid_int, m_dict, [labels]]
+        # meta   = [n_meta, None,     None,         None,    m_meta, None]
+        # scalar columns (labels/type/id) have None in meta — n is at 0, m is at 4
         if len(results) > 1:
             for row in results[1].get("data", []):
                 row_data = row.get("row", [])
                 meta = row.get("meta", [])
-                if len(row_data) < 3 or len(meta) < 3:
+                if len(row_data) < 6 or len(meta) < 5:
                     continue
-                n, r, m = row_data[0], row_data[1], row_data[2]
-                n_meta, r_meta, m_meta = meta[0], meta[1], meta[2]
+                n_data, n_labels, rel_type, r_id_raw, m_data, m_labels = (
+                    row_data[0], row_data[1], row_data[2], row_data[3], row_data[4], row_data[5]
+                )
+                n_meta, m_meta = meta[0], meta[4]  # meta[1-3] are None (scalar columns)
                 n_id = str(n_meta.get("id", ""))
                 m_id = str(m_meta.get("id", ""))
-                r_id = str(r_meta.get("id", ""))
-                for node_id, node_data, node_meta in [(n_id, n, n_meta), (m_id, m, m_meta)]:
+                r_id = str(r_id_raw) if r_id_raw is not None else ""
+                for node_id, node_data, node_lbls in [(n_id, n_data, n_labels), (m_id, m_data, m_labels)]:
                     if node_id and node_id not in nodes:
                         nodes[node_id] = {
                             "id": node_id,
                             "label": node_data.get("name", node_data.get("value", node_id)),
-                            "type": node_meta.get("labels", ["unknown"])[0].lower() if node_meta.get("labels") else "unknown",
+                            "type": (node_lbls[0].lower() if isinstance(node_lbls, list) and node_lbls else "entity"),
                             "properties": {k: v for k, v in node_data.items() if k != "case_id"},
                         }
-                edge_key = f"{n_id}-{r_meta.get('type', '')}-{m_id}"
+                edge_key = f"{n_id}-{rel_type}-{m_id}"
                 if r_id and edge_key not in seen_edges:
                     seen_edges.add(edge_key)
                     edges.append({
                         "id": r_id,
                         "from_": n_id,
                         "to": m_id,
-                        "label": r_meta.get("type", "RELATED_TO"),
+                        "label": rel_type or "RELATED_TO",
                     })
 
         return {"nodes": list(nodes.values()), "edges": edges}
@@ -103,8 +109,8 @@ async def get_case_graph(case_id: str) -> dict[str, list]:
         return {"nodes": [], "edges": []}
 
 
-async def upsert_entities(case_id: str, entities: list[dict]) -> None:
-    """Merge SpiderFoot entities as Neo4j nodes tagged with case_id."""
+async def upsert_entities(case_id: str, entities: list[dict], scan_target: str | None = None) -> None:
+    """Merge SpiderFoot entities as Neo4j nodes and link them to the scan target root node."""
     settings = get_settings()
     if not settings.neo4j_uri or not entities:
         return
@@ -114,27 +120,56 @@ async def upsert_entities(case_id: str, entities: list[dict]) -> None:
         url = settings.neo4j_uri.replace("bolt://", "http://").replace(":7687", ":7474")
 
         statements = []
+
+        # Create a root ScanTarget node if scan_target is provided
+        if scan_target:
+            statements.append({
+                "statement": """
+                    MERGE (root:ScanTarget {value: $value})
+                    SET root.case_id = $case_id, root.name = $value, root.source = 'spiderfoot'
+                """,
+                "parameters": {"value": scan_target, "case_id": case_id},
+            })
+
         for ent in entities:
             node_type = ent.get("type", "Entity").replace(" ", "_")
             value = str(ent.get("value", ""))[:500]
-            if not value:
+            if not value or value == scan_target:
                 continue
-            statements.append({
-                "statement": f"""
-                    MERGE (n:{node_type} {{value: $value}})
-                    SET n.case_id = $case_id, n.name = $value, n.source = $source
-                """,
-                "parameters": {
-                    "value": value,
-                    "case_id": case_id,
-                    "source": ent.get("source", "spiderfoot"),
-                },
-            })
+            if scan_target:
+                # Merge node and create DISCOVERED_FROM edge to root in one statement
+                statements.append({
+                    "statement": f"""
+                        MERGE (n:{node_type} {{value: $value}})
+                        SET n.case_id = $case_id, n.name = $value, n.source = $source
+                        WITH n
+                        MATCH (root:ScanTarget {{value: $root_value, case_id: $case_id}})
+                        MERGE (root)-[:DISCOVERED_FROM]->(n)
+                    """,
+                    "parameters": {
+                        "value": value,
+                        "case_id": case_id,
+                        "source": ent.get("source", "spiderfoot"),
+                        "root_value": scan_target,
+                    },
+                })
+            else:
+                statements.append({
+                    "statement": f"""
+                        MERGE (n:{node_type} {{value: $value}})
+                        SET n.case_id = $case_id, n.name = $value, n.source = $source
+                    """,
+                    "parameters": {
+                        "value": value,
+                        "case_id": case_id,
+                        "source": ent.get("source", "spiderfoot"),
+                    },
+                })
 
         if not statements:
             return
 
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             await client.post(
                 f"{url}/db/neo4j/tx/commit",
                 json={"statements": statements},
