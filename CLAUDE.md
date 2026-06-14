@@ -138,9 +138,9 @@ NEO4J_URI               # bolt://localhost:7687
 REDIS_URL               # redis://localhost:6379/0
 MINIO_ENDPOINT          # localhost:9000
 SEARXNG_URL             # http://localhost:8080
-PERPLEXICA_URL          # http://localhost:3001
+PERPLEXICA_URL          # http://localhost:3002  (Vane image — root / returns 200, /api/health returns 404)
 SPIDERFOOT_URL          # http://localhost:5001
-MIROFISH_URL            # http://localhost:5002
+# MIROFISH_URL — leave unset to use LLM fallback; set to http://localhost:5002 only if Zep graph workflow is configured
 SECRET_KEY              # JWT signing key
 ```
 
@@ -152,6 +152,22 @@ BRIEF_MODEL             # default: qwen3:14b
 VISION_MODEL            # default: gemma4:27b
 SIMULATION_MODEL        # default: qwen3:14b
 ```
+
+## Integration Notes
+
+**SpiderFoot API** (CherryPy, not REST-style):
+- Start: `POST /startscan` with form data (`scanname`, `scantarget`, `usecase=all`) + `Accept: application/json` → returns `["SUCCESS", scanId]`
+- Status: `GET /scanstatus?id={scanId}` → array where index 5 is status string (`FINISHED` / `ABORTED` / `ERROR-FAILED`)
+- Results: `GET /scaneventresults?id={scanId}` → array of result arrays
+- Abort: `GET /stopscan?id={scanId}`
+
+**Perplexica / Vane image**: health check is `GET /` (200 OK) — `/api/health` returns 404
+
+**MinIO**: `MINIO_ENDPOINT` must NOT have `http://` prefix — code in `verify/router.py` prepends it
+
+**MiroFish**: `MIROFISH_URL` unset → LLM fallback used (correct behavior). Setting it requires Zep graph workflow configured — see `modules/simulation/tasks.py`
+
+**get_settings() lru_cache**: after `.env` changes, use `docker compose up -d --force-recreate api worker` (plain restart doesn't reload env vars)
 
 ## Do Not Touch
 
@@ -193,24 +209,24 @@ SIMULATION_MODEL        # default: qwen3:14b
 | postgres | 5432 | primary database |
 | neo4j | 7474/7687 | graph relationships |
 | redis | 6379 | queue + cache |
-| meilisearch | 7700 | full-text search |
+| meilisearch | 7700 | full-text search (feed_items index — see core/search.py) |
 | minio | 9000/9001 | object storage |
 | ollama | 11434 | local LLM inference |
 | searxng | 8080 | meta search engine |
-| perplexica | 3001 | AI research assistant |
+| perplexica | 3002 | AI research assistant (Vane image — health check GET /, not /api/health) |
 | spiderfoot | 5001 | OSINT scanner |
-| mirofish | 5002 | simulation engine |
+| mirofish | 5002 | simulation API (LLM fallback used when MIROFISH_URL unset) |
+| mirofish-ui | 5003 | simulation frontend |
 | n8n | 5678 | workflow automation |
 | tor-proxy | 9050 | Tor SOCKS5 (isolated) |
 | content-filter | 8001 | dark web content filter (isolated) |
-| grafana | 3030 | monitoring dashboards |
 
 ## Deployment
 
-- Production: single-host Docker Compose, nginx reverse proxy, SSL via Let's Encrypt
+- Production: single-host Docker Compose, nginx reverse proxy, SSL via Let's Encrypt — run `./deploy.sh`
 - Scaling path: split `api` workers horizontally behind load balancer, scale Celery workers independently
 - Dark web services run in isolated Docker network (`darkweb-net`, `internal: true`) — no direct internet access except through Tor proxy
-- Monitoring: Grafana + Prometheus, alerts via configured notification channels
+- Service health: `GET /api/v1/admin/health` or Admin → Settings → Health tab
 
 ## Module Reference Map
 

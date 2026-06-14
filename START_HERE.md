@@ -1,150 +1,97 @@
 # เริ่มต้นที่นี่ — ขึ้น OSINT//DESK บน Ubuntu
 
-คู่มือนี้พาขึ้น Phase 0 (infrastructure) แล้วส่งต่อให้ Claude Code ทำ Phase 1+
+ระบบนี้พร้อมใช้งานแล้ว (Phase 0–5 สมบูรณ์) — รันคำสั่งเดียวจบ
 
 ---
 
 ## สิ่งที่ต้องมีบน Ubuntu ก่อน
 
-- Docker + Docker Compose plugin
-- Node.js 20+ (สำหรับ Claude Code)
-- Ollama ที่รันอยู่แล้ว พร้อม model: `qwen3:8b` อย่างน้อย
-- Anthropic API key (สำหรับ Claude Code)
+| สิ่งที่ต้องการ | ขั้นต่ำ | ตรวจสอบ |
+|---|---|---|
+| Docker + Docker Compose plugin | 24+ / 2.20+ | `docker compose version` |
+| RAM | 16 GB | `free -h` |
+| Disk | 50 GB ว่าง | `df -h` |
+| Ollama | latest | `curl http://localhost:11434/api/tags` |
 
-ตรวจเร็วๆ:
+ถ้า Ollama ยังไม่มี model:
 ```bash
-docker --version && docker compose version
-node --version
-curl -s http://localhost:11434/api/tags   # ดู Ollama models
-```
-
-ถ้ายังไม่มี model:
-```bash
-ollama pull qwen3:8b
-ollama pull qwen3:14b      # สำหรับ brief/simulation (optional ตอนแรก)
+ollama pull qwen3:8b          # โมเดลหลัก (ต้องมี)
+ollama pull qwen3:14b         # สำหรับ brief/simulation
+ollama pull gemma4:12b        # สำหรับ vision/verify (ถ้า VRAM พอ)
 ```
 
 ---
 
-## ขั้นที่ 1 — วาง repo บน Ubuntu
+## ขั้นตอนเดียว — ติดตั้งและรัน
 
-จาก Mac, copy zip ขึ้น Ubuntu (แก้ user@host ตามจริง):
 ```bash
-scp osint_desk_repo.zip user@ubuntu-host:~/
-scp osint_starter.zip   user@ubuntu-host:~/
+# Clone repo
+git clone <repo-url> osintdesk && cd osintdesk
+
+# รัน deploy script
+./deploy.sh
 ```
 
-SSH เข้า Ubuntu แล้วแตกไฟล์:
+script จะถามรหัสผ่านสำหรับ PostgreSQL, Neo4j, MinIO และ Ollama URL
+จากนั้นทำทุกอย่างอัตโนมัติ: build images → ขึ้น services → migrate DB → seed admin → ตรวจสอบ integration
+
+เมื่อเสร็จ เปิดเบราว์เซอร์:
+- **UI** → `http://localhost:3000`
+- **API Docs** → `http://localhost:8000/docs`
+
+**Login:** `admin@osintdesk.local` / รหัสผ่านที่กรอกตอน `./deploy.sh`
+
+> เปลี่ยน password ทันทีหลัง login ครั้งแรก: Admin → Settings → Users
+
+---
+
+## คำสั่งที่ใช้บ่อย
+
 ```bash
-ssh user@ubuntu-host
-cd ~
-unzip osint_desk_repo.zip -d osintdesk    # ได้ CLAUDE.md, README.md, docs/
-unzip osint_starter.zip -d osintdesk       # ได้ docker-compose, .env.example, bootstrap.sh
-cd osintdesk
-```
-
-โครงสร้างที่ควรได้:
-```
-osintdesk/
-├── CLAUDE.md
-├── README.md
-├── docker-compose.dev.yml
-├── .env.example
-├── bootstrap.sh
-└── docs/
-    ├── roadmap.md
-    ├── specs/
-    └── mockups/
+./deploy.sh --update    # อัพเดทโค้ด — rebuild images + restart (ไม่ถามรหัสผ่านซ้ำ)
+./deploy.sh --restart   # restart api + worker เร็วกว่า rebuild
+./deploy.sh --logs      # ดู live logs ทุก service
+./deploy.sh --down      # หยุดทุก service
 ```
 
 ---
 
-## ขั้นที่ 2 — รัน bootstrap
+## ถ้า Ollama อยู่คนละเครื่อง
 
+แก้ `.env` ก่อนรัน `./deploy.sh`:
 ```bash
-./bootstrap.sh
-```
-
-script จะ:
-- ตรวจ docker + ollama
-- สร้าง `.env` พร้อม generate SECRET_KEY
-- ดึง images
-- ขึ้น infrastructure 6 ตัว (postgres, redis, neo4j, meilisearch, minio, searxng)
-
-**สำคัญ:** เปิด `.env` แก้ password ก่อนทำต่อ
-```bash
-nano .env    # แก้ POSTGRES_PASSWORD, NEO4J_PASSWORD, MINIO_PASSWORD, MEILI_MASTER_KEY
-```
-
-ถ้า Ollama อยู่คนละเครื่อง (เช่น A5000 แยก) แก้บรรทัดนี้ใน `.env`:
-```
-OLLAMA_BASE_URL=http://100.94.37.18:11434
-```
-
-ตรวจว่า infra ขึ้นครบ:
-```bash
-docker compose -f docker-compose.dev.yml ps
+nano .env
+# เปลี่ยน:
+OLLAMA_BASE_URL=http://192.168.1.100:11434   # IP ของเครื่อง Ollama จริง
 ```
 
 ---
 
-## ขั้นที่ 3 — ติดตั้ง Claude Code
+## Dark Web Module (Phase 5)
+
+Dark web module **ปิดอยู่โดย default** — ต้องทำก่อนเปิดใช้:
+
+1. ขอ legal approval เป็นลายลักษณ์อักษรจากฝ่ายกฎหมายขององค์กร
+2. อ่าน `docs/specs/11_darkweb_module.md` — ครบทุกข้อ
+3. ตั้ง editorial policy สำหรับ query ที่อนุญาต
+4. เปิดใช้ใน Admin → Settings → Dark Web
+
+ไม่มีเหตุผลด้านเทคนิคที่ต้องรีบเปิด — ข้ามไปก่อนได้
+
+---
+
+## ถ้าระบบขึ้นแล้วมีปัญหา
 
 ```bash
-npm install -g @anthropic-ai/claude-code
-export ANTHROPIC_API_KEY=sk-ant-...    # API key ของคุณ
+# ดู logs service ที่มีปัญหา
+docker compose logs -f api
+docker compose logs -f worker
+
+# ตรวจ health ทุก service
+curl http://localhost:8000/api/v1/admin/health
+
+# force recreate ถ้า env var ไม่โหลด
+docker compose up -d --force-recreate api worker
 ```
 
----
-
-## ขั้นที่ 4 — ให้ Claude Code ทำ Phase 1
-
-```bash
-cd ~/osintdesk
-claude
-```
-
-แล้วพิมพ์:
-```
-อ่าน CLAUDE.md และ docs/roadmap.md จากนั้น implement Phase 1 (Ingestion + Triage)
-สร้าง services/api และ services/frontend ตามโครงสร้างใน CLAUDE.md
-เริ่มจาก RSS adapter + triage scoring ก่อน
-```
-
-Claude Code จะ:
-- สร้าง `services/api/` (FastAPI + adapters + triage module)
-- สร้าง `services/frontend/` (Next.js + Today's Intel page)
-- เขียน Dockerfile ของแต่ละ service
-- ทดสอบจน RSS feed เข้า → score → แสดงผลได้
-
----
-
-## ขั้นที่ 5 — ขึ้น stack เต็ม
-
-หลัง Claude Code สร้าง api + frontend เสร็จ:
-```bash
-docker compose -f docker-compose.dev.yml up -d --build
-```
-
-เปิดดู:
-- Frontend → http://ubuntu-host:3000
-- API docs → http://ubuntu-host:8000/docs
-
----
-
-## หลังจากนี้
-
-ทำ Phase ต่อไปตาม `docs/roadmap.md` — บอก Claude Code ทีละ phase:
-```
-implement Phase 2 (Investigation + Verify) ตาม docs/roadmap.md
-```
-
-แต่ละ phase Claude Code จะอ่าน spec + mockup ที่เกี่ยวข้องเองจาก Module Reference Map ใน CLAUDE.md
-
----
-
-## หมายเหตุ
-
-- **Dark web module (Phase 5)** — อย่าขึ้นบนเครื่องนี้ ต้องแยก VM + ผ่าน legal review ก่อน
-- ถ้า RAM ไม่พอตอนรัน model ใหญ่ — ใช้ qwen3:8b อย่างเดียวไปก่อน ปรับใน `.env`
-- Neo4j ครั้งแรกอาจใช้เวลา ~30 วินาทีกว่าจะ healthy
+เอกสารเพิ่มเติม: `README.md` (workflow), `CLAUDE.md` (สำหรับ developer), `docs/roadmap.md`

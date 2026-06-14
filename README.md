@@ -51,31 +51,31 @@ ollama pull gemma4:12b        # สำหรับ vision/verify (ถ้า VRAM
 ### ติดตั้งและรัน
 
 ```bash
-# 1. Clone หรือแตกไฟล์ repo
+# Clone repo
 git clone <repo-url> osintdesk && cd osintdesk
 
-# 2. สร้าง .env จาก template แล้วแก้ password
-cp .env.example .env
-nano .env          # แก้ POSTGRES_PASSWORD, NEO4J_PASSWORD, SECRET_KEY
-
-# ถ้า Ollama อยู่คนละเครื่อง
-# OLLAMA_BASE_URL=http://<ip-เครื่อง-ollama>:11434
-
-# 3. รัน bootstrap (ตรวจระบบ + สร้าง DB + seed ข้อมูลเริ่มต้น)
-./bootstrap.sh
-
-# 4. ขึ้น stack เต็ม
-docker compose -f docker-compose.dev.yml up -d
-
-# 5. ตรวจสอบว่าทุก service ขึ้นครบ
-docker compose -f docker-compose.dev.yml ps
+# รัน deploy script (interactive — ถามรหัสผ่านและ Ollama URL)
+./deploy.sh
 ```
 
+script จะ: ตรวจ prerequisites → ตั้งค่า .env → build images → ขึ้น 14 services → migrate DB → seed admin → ตรวจสอบ integration
+
 เปิดเบราว์เซอร์:
-- **UI** → `http://localhost:3000` (login: `admin@example.com` / `changeme`)
+- **UI** → `http://localhost:3000`
 - **API Docs** → `http://localhost:8000/docs`
 
+**Login:** ใช้ email + password ที่กรอกตอนรัน `./deploy.sh` (default: `admin@osintdesk.local` / `changeme`)
+
 > **สำคัญ:** เปลี่ยน password ทันทีหลัง login ครั้งแรกที่ Admin → Settings → Users
+
+#### อัพเดทในอนาคต
+
+```bash
+./deploy.sh --update    # rebuild images + restart (ไม่ถามรหัสผ่านซ้ำ)
+./deploy.sh --restart   # restart api + worker เท่านั้น (เร็วกว่า)
+./deploy.sh --logs      # ดู live logs
+./deploy.sh --down      # หยุดทุก service
+```
 
 ---
 
@@ -681,23 +681,23 @@ C = Consistent (สนับสนุน) / I = Inconsistent (ขัดแย้
 | PostgreSQL | 5432 | ฐานข้อมูลหลัก |
 | Redis | 6379 | Queue + Cache |
 | Neo4j | 7474 / 7687 | Graph database (ความสัมพันธ์ entity) |
-| Meilisearch | 7700 | Full-text search ข้ามทุก case |
-| MinIO | 9000 / 9001 | Object storage (ไฟล์ / media) |
-| Ollama | 11434 | LLM inference (รันในเครื่อง) |
-| SearXNG | 8080 | Meta search engine (ไม่ถูกติดตาม) |
-| Perplexica | 3001 | AI research assistant |
+| Meilisearch | 7700 | Full-text search ของ feed items |
+| MinIO | 9000 / 9001 | Object storage (ไฟล์ / media) — console ที่ port 9001 |
+| Ollama | 11434 | LLM inference (รันบน host ไม่อยู่ใน compose) |
+| SearXNG | 8080 | Meta search engine (research panel) |
+| Perplexica | **3002** | AI research assistant (Vane image) |
 | SpiderFoot | 5001 | OSINT scanner |
-| MiroFish | 5002 | Simulation engine |
+| MiroFish backend | 5002 | Simulation API |
+| MiroFish UI | 5003 | Simulation frontend |
 | n8n | 5678 | Workflow automation |
-| Tor proxy | 9050 | SOCKS5 สำหรับ dark web (isolated) |
-| Grafana | 3030 | Monitoring dashboard |
+| Tor proxy | 9050 | SOCKS5 สำหรับ dark web (isolated network) |
 
 ### ตรวจสุขภาพระบบ
 
 ```
 Admin → Settings → แท็บ Health    (real-time ping ทุก service)
 หรือ
-http://localhost:3030              (Grafana dashboard)
+http://localhost:8000/docs         (API Swagger — ทดสอบ endpoint โดยตรง)
 ```
 
 ---

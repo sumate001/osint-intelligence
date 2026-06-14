@@ -16,13 +16,13 @@
 
 **เป้าหมาย:** วางโครงสร้างที่ทุก module ต่อยอดได้
 
-- [ ] ตั้ง repo structure ตาม CLAUDE.md (`services/api`, `services/frontend`, `infra`)
-- [ ] `docker-compose.dev.yml` — postgres, redis, neo4j, ollama, minio ขึ้นได้
-- [ ] `services/api/core/` — config, db (async SQLAlchemy), cache, queue, auth (JWT)
-- [ ] `services/api/core/llm.py` — LLM client + model routing per module
-- [ ] FastAPI app skeleton + health check endpoint
-- [ ] Next.js skeleton + design system (CSS variables จาก CLAUDE.md) + app shell (sidebar + topbar)
-- [ ] CI: lint + type-check + test pipeline
+- [x] ตั้ง repo structure ตาม CLAUDE.md (`services/api`, `services/frontend`, `infra`)
+- [x] `docker-compose.dev.yml` — postgres, redis, neo4j, ollama, minio ขึ้นได้
+- [x] `services/api/core/` — config, db (async SQLAlchemy), cache, queue, auth (JWT)
+- [x] `services/api/core/llm.py` — LLM client + model routing per module
+- [x] FastAPI app skeleton + health check endpoint
+- [x] Next.js skeleton + design system (CSS variables จาก CLAUDE.md) + app shell (sidebar + topbar)
+- [x] CI: lint + type-check + test pipeline
 
 **สาธิตได้:** เปิดเว็บเห็น shell ว่างๆ, API ตอบ health check, ทุก service ขึ้นด้วย compose
 
@@ -34,14 +34,14 @@
 
 อ่าน: `docs/specs/06_adapter_framework.md`, `07_adapter_spec.md` · mockup: `08_adapter_ui.html`, `04_app_prototype.html`
 
-- [ ] `adapters/base.py` — BaseAdapter ABC + CanonicalFeedItem schema
-- [ ] `adapters/rss.py` — RSS adapter ตัวแรก (ง่ายสุด เริ่มจากตัวนี้)
-- [ ] `adapters/registry.py` — plugin registry
-- [ ] `modules/triage/` — LLM scoring 7 เกณฑ์ + verdict + entity extraction
-- [ ] `modules/reliability/` — Admiralty scoring ตอน ingestion (cross-cutting layer)
-- [ ] Celery worker: ingest → score → store
-- [ ] Frontend: Today's Intel page (mockup 04) — status bar + alert cards
-- [ ] Frontend: Admin → adapter config (mockup 08)
+- [x] `adapters/base.py` — BaseAdapter ABC + CanonicalFeedItem schema
+- [x] `adapters/rss.py` — RSS adapter ตัวแรก (ง่ายสุด เริ่มจากตัวนี้)
+- [x] `adapters/registry.py` — plugin registry
+- [x] `modules/triage/` — LLM scoring 7 เกณฑ์ + verdict + entity extraction
+- [x] `modules/reliability/` — Admiralty scoring ตอน ingestion (cross-cutting layer)
+- [x] Celery worker: ingest → score → store
+- [x] Frontend: Today's Intel page (mockup 04) — status bar + alert cards
+- [x] Frontend: Admin → adapter config (mockup 08)
 
 **สาธิตได้:** เพิ่ม RSS feed ใน admin → ข่าวเข้ามา → ได้คะแนน → เห็นใน Today's Intel เรียงตาม verdict
 
@@ -53,12 +53,12 @@
 
 อ่าน: `docs/specs/02_architecture.md` · mockup: `04_app_prototype.html`
 
-- [ ] `modules/investigation/` — case CRUD, evidence board, timeline
-- [ ] เชื่อม SpiderFoot — network scan → Neo4j
-- [ ] Frontend: Network graph (vis-network), Evidence board (kanban), Timeline
-- [ ] เชื่อม Perplexica — research panel ใน investigation
-- [ ] `modules/verify/` — ExifTool, Wayback, reverse image, faster-whisper
-- [ ] Frontend: UGC Verify page (drop zone + result cards)
+- [x] `modules/investigation/` — case CRUD, evidence board, timeline
+- [x] เชื่อม SpiderFoot — network scan → Neo4j
+- [x] Frontend: Network graph (vis-network), Evidence board (kanban), Timeline
+- [x] เชื่อม Perplexica — research panel ใน investigation
+- [x] `modules/verify/` — ExifTool, Wayback, reverse image, faster-whisper
+- [x] Frontend: UGC Verify page (drop zone + result cards)
 
 **สาธิตได้:** เปิด case จาก Today's Intel → รัน SpiderFoot → เห็น network graph → เพิ่ม evidence → อัปโหลดคลิป verify
 
@@ -70,11 +70,11 @@
 
 อ่าน: `docs/specs/02_architecture.md` · mockup: `04_app_prototype.html`
 
-- [ ] `modules/brief/` — two-tier brief (internal/public), LLM draft
-- [ ] `modules/confidence/` — confidence levels + dissent + ACH
-- [ ] Approval workflow (RBAC: analyst draft → editor approve)
-- [ ] Export: PDF (internal/public), GEXF, CSV
-- [ ] Frontend: Brief Builder + mode toggle + export panel
+- [x] `modules/brief/` — two-tier brief (internal/public), LLM draft
+- [x] `modules/confidence/` — confidence levels + dissent + ACH
+- [x] Approval workflow (RBAC: analyst draft → editor approve)
+- [x] Export: PDF (internal/public), GEXF, CSV
+- [x] Frontend: Brief Builder + mode toggle + export panel
 
 **สาธิตได้:** สร้าง brief จาก investigation → toggle internal/public → ส่ง editor → approve → export PDF
 
@@ -86,11 +86,11 @@
 
 อ่าน: `docs/specs/12_intelligence_cycle.md` · mockup: `12_intelligence_ui.html`
 
-- [ ] `modules/requirements/` — PIR tasking + EEI tracking + auto-match
-- [ ] `modules/collaboration/` — activity feed, comments, dissent, real-time (WebSocket)
-- [ ] `modules/deception/` — counter-intel checks + bot network detection
-- [ ] `modules/knowledge/` — cross-case entity history + pattern detection
-- [ ] Frontend: ทั้ง 6 module ตาม mockup 12
+- [x] `modules/requirements/` — PIR tasking + EEI tracking + auto-match
+- [x] `modules/collaboration/` — activity feed, comments, dissent, real-time (WebSocket)
+- [x] `modules/deception/` — counter-intel checks + bot network detection
+- [x] `modules/knowledge/` — cross-case entity history + pattern detection
+- [x] Frontend: ทั้ง 6 module ตาม mockup 12
 
 **สาธิตได้:** สร้าง PIR → ระบบ match ข้อมูลเข้า → หลาย analyst ทำ case ร่วมกัน → ดู entity history ข้ามเคส
 
@@ -100,12 +100,12 @@
 
 **เป้าหมาย:** ความสามารถขั้นสูง (optional ตามความต้องการลูกค้า)
 
-- [ ] `modules/simulation/` — MiroFish integration (spec 09, mockup 09)
-- [ ] `modules/darkweb/` — isolated crawler (spec 11, mockup 11) — **ต้องผ่าน legal review ก่อน**
-- [ ] Environment Monitor — landscape signal tracking
-- [ ] Watchlist + scheduled scans
-- [ ] Full admin settings (mockup 10)
-- [ ] Monitoring: Grafana dashboards
+- [x] `modules/simulation/` — MiroFish integration (spec 09, mockup 09)
+- [x] `modules/darkweb/` — isolated crawler (spec 11, mockup 11) — **ต้องผ่าน legal review ก่อน**
+- [x] Environment Monitor — landscape signal tracking
+- [x] Watchlist + scheduled scans
+- [x] Full admin settings (mockup 10)
+- [x] Monitoring: Grafana dashboards
 
 **สาธิตได้:** trigger simulation จาก high-impact case, dark web monitoring (ถ้า legal อนุมัติ)
 
