@@ -16,6 +16,9 @@ class VerifyJob(Base):
     minio_key: Mapped[str] = mapped_column(String(1000), nullable=False)
     file_size: Mapped[int | None] = mapped_column(nullable=True)
 
+    # set when job was triggered automatically from a feed item (auto_verify)
+    feed_item_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+
     # PENDING / PROCESSING / DONE / FAILED
     status: Mapped[str] = mapped_column(String(50), default="PENDING", index=True)
 

@@ -213,6 +213,7 @@ services:
     build:
       context: ./services/frontend
       dockerfile: Dockerfile
+      target: dev
     container_name: osint-frontend
     ports:
       - "3000:3000"
@@ -226,7 +227,6 @@ services:
       NEXT_PUBLIC_PERPLEXICA_URL: http://localhost:3002
     depends_on:
       - api
-    command: pnpm dev
     restart: unless-stopped
 
 volumes:

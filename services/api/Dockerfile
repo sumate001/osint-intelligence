@@ -7,6 +7,7 @@ COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git openssh-client \
+    ffmpeg libimage-exiftool-perl \
     && curl -SL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" \
        -o /usr/local/bin/docker-compose \
     && chmod +x /usr/local/bin/docker-compose \

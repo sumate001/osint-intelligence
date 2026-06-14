@@ -1,7 +1,10 @@
 import httpx
 import json
+import logging
 from typing import Any
 from .config import get_settings
+
+log = logging.getLogger(__name__)
 
 MODEL_ROUTING: dict[str, str] = {}
 
@@ -69,6 +72,36 @@ async def chat_json(
         import re
         raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
     return json.loads(raw)
+
+
+async def transcribe_audio(audio_bytes: bytes, model: str | None = None) -> str | None:
+    """Transcribe audio/video audio track using Ollama Whisper.
+    Sends raw WAV bytes (16kHz mono) encoded as base64 to /api/generate.
+    Returns transcript string or None if unavailable."""
+    import base64
+    settings = get_settings()
+    resolved_model = model or getattr(settings, "whisper_model", "whisper")
+    audio_b64 = base64.b64encode(audio_bytes).decode()
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                f"{settings.ollama_base_url}/api/generate",
+                json={"model": resolved_model, "prompt": "", "audio": audio_b64},
+            )
+            response.raise_for_status()
+            text = response.json().get("response", "").strip()
+            return text or None
+    except Exception as exc:
+        log.warning("Whisper transcription failed (%s): %s", resolved_model, exc)
+        return None
+
+
+async def analyze_image_b64(image_b64: str, prompt: str, model: str | None = None) -> str:
+    """Analyze a single image (base64 JPEG/PNG) with the vision model."""
+    settings = get_settings()
+    resolved_model = model or getattr(settings, "vision_model", "gemma3:27b")
+    messages = [{"role": "user", "content": prompt, "images": [image_b64]}]
+    return await chat_completion(messages, module="vision", model=resolved_model, timeout=120.0)
 
 
 async def health_check() -> bool:

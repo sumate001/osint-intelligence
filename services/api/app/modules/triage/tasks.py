@@ -89,6 +89,8 @@ async def _ingest_source(source_id: str):
             return
 
         new_count = 0
+        media_to_verify: list[tuple[str, list]] = []  # (feed_item_id, media_items)
+
         for canonical in items:
             # Dedup check — use limit(1) + scalar to avoid MultipleResultsFound
             exists = (await db.execute(
@@ -159,6 +161,8 @@ async def _ingest_source(source_id: str):
                     if isinstance(e, dict)
                 ),
             })
+            if canonical.media:
+                media_to_verify.append((str(feed_item.id), canonical.media))
             new_count += 1
 
         source.last_fetched_at = datetime.now(timezone.utc)
@@ -166,3 +170,73 @@ async def _ingest_source(source_id: str):
         source.last_error = None
         await db.commit()
         logger.info("Source %s: stored %d new items", source_id, new_count)
+
+    if media_to_verify:
+        await _maybe_auto_verify(media_to_verify, AsyncSessionLocal)
+
+
+async def _maybe_auto_verify(
+    media_to_verify: list[tuple[str, list]],
+    SessionLocal,
+) -> None:
+    """If auto_verify Autopilot step is enabled, download and queue verify jobs for feed media."""
+    from ...modules.admin.models import SystemSettings
+    from sqlalchemy import select
+
+    async with SessionLocal() as db:
+        row = (await db.execute(select(SystemSettings).where(SystemSettings.id == 1))).scalar_one_or_none()
+
+    if not row:
+        return
+    automation = row.data.get("automation", {})
+    if not automation.get("enabled", False):
+        return
+    if not automation.get("steps", {}).get("auto_verify", False):
+        return
+
+    import uuid as uuid_mod
+    import httpx
+    from ...modules.verify.models import VerifyJob
+    from ...modules.verify.service import upload_to_minio, determine_file_type
+    from ...modules.verify.tasks import run_verify_pipeline
+    from pathlib import Path
+
+    async with SessionLocal() as db:
+        for feed_item_id, media_list in media_to_verify:
+            for media in media_list:
+                url = media.url if hasattr(media, "url") else media.get("url", "")
+                if not url:
+                    continue
+                try:
+                    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                        resp = await client.get(url)
+                        if resp.status_code != 200:
+                            continue
+                        data = resp.content
+                except Exception as exc:
+                    logger.warning("auto_verify: download failed %s: %s", url, exc)
+                    continue
+
+                filename = Path(url.split("?")[0]).name or "media"
+                content_type = resp.headers.get("content-type", "application/octet-stream")
+                file_type = determine_file_type(filename, content_type)
+                minio_key = f"verify/{uuid_mod.uuid4()}/{filename}"
+
+                await upload_to_minio(data, minio_key, content_type)
+
+                job = VerifyJob(
+                    filename=filename,
+                    file_type=file_type,
+                    minio_key=minio_key,
+                    file_size=len(data),
+                    feed_item_id=uuid_mod.UUID(feed_item_id),
+                )
+                db.add(job)
+                await db.flush()
+                await db.refresh(job)
+                run_verify_pipeline.delay(str(job.id))
+                logger.info(
+                    "auto_verify: queued job %s for feed_item %s (%s)",
+                    job.id, feed_item_id, file_type,
+                )
+        await db.commit()

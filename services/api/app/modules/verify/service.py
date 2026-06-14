@@ -1,8 +1,9 @@
-"""Verification service: EXIF, Wayback, reverse image search."""
+"""Verification service: EXIF, Wayback, reverse image search, media analysis."""
 import io
 import json
 import logging
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -107,6 +108,85 @@ async def reverse_image_search(image_bytes: bytes, filename: str) -> list[dict]:
                 ]
     except Exception as exc:
         log.debug("Reverse image search failed: %s", exc)
+    return []
+
+
+async def upload_to_minio(data: bytes, key: str, content_type: str) -> bool:
+    """Upload bytes to MinIO. Returns True on success."""
+    import httpx
+    settings = get_settings()
+    minio_endpoint = getattr(settings, "minio_endpoint", "") or ""
+    minio_user = getattr(settings, "minio_user", "") or ""
+    minio_password = getattr(settings, "minio_password", "") or ""
+    if not minio_endpoint:
+        return False
+    try:
+        bucket, *key_parts = key.split("/", 1)
+        obj_key = key_parts[0] if key_parts else key
+        async with httpx.AsyncClient(timeout=30) as client:
+            await client.put(
+                f"http://{minio_endpoint}/{bucket}",
+                auth=(minio_user, minio_password),
+            )
+            resp = await client.put(
+                f"http://{minio_endpoint}/{bucket}/{obj_key}",
+                content=data,
+                headers={"Content-Type": content_type},
+                auth=(minio_user, minio_password),
+            )
+            return resp.status_code in (200, 204)
+    except Exception:
+        return False
+
+
+def extract_audio_bytes(video_bytes: bytes) -> bytes | None:
+    """Extract audio from video as 16kHz mono WAV using ffmpeg (stdin→stdout)."""
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-i", "pipe:0",
+                "-vn",                  # no video
+                "-acodec", "pcm_s16le", # WAV PCM
+                "-ar", "16000",         # 16kHz — Whisper optimal
+                "-ac", "1",             # mono
+                "-f", "wav", "pipe:1",
+            ],
+            input=video_bytes,
+            capture_output=True,
+            timeout=120,
+        )
+        if result.returncode == 0 and result.stdout:
+            return result.stdout
+        log.warning("ffmpeg audio extract stderr: %s", result.stderr[:200])
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        log.warning("ffmpeg audio extract failed: %s", exc)
+    return None
+
+
+def extract_keyframes(video_bytes: bytes, max_frames: int = 5) -> list[bytes]:
+    """Extract I-frames (keyframes) from video as JPEG bytes via ffmpeg."""
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = f"{tmpdir}/input.mp4"
+            Path(input_path).write_bytes(video_bytes)
+            subprocess.run(
+                [
+                    "ffmpeg", "-i", input_path,
+                    "-vf", "select=eq(pict_type\\,I),scale=640:-1",
+                    "-vsync", "vfr",
+                    "-q:v", "5",
+                    f"{tmpdir}/frame_%04d.jpg",
+                ],
+                capture_output=True,
+                timeout=120,
+                check=False,
+            )
+            frames = []
+            for jpg in sorted(Path(tmpdir).glob("frame_*.jpg"))[:max_frames]:
+                frames.append(jpg.read_bytes())
+            return frames
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        log.warning("ffmpeg keyframe extract failed: %s", exc)
     return []
 
 

@@ -1,48 +1,16 @@
 import uuid
-import io
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy import select, func
 
 from ...core.db import get_db
 from ...core.auth import get_current_user
-from ...core.config import get_settings
 from .models import VerifyJob
 from .schemas import VerifyJobOut, VerifyJobListOut
-from .service import determine_file_type
+from .service import determine_file_type, upload_to_minio
 from .tasks import run_verify_pipeline
 
 router = APIRouter()
-
-
-async def _upload_to_minio(data: bytes, key: str, content_type: str) -> bool:
-    """Upload bytes to MinIO. Returns True on success."""
-    import httpx
-    settings = get_settings()
-    minio_endpoint = getattr(settings, "minio_endpoint", "") or ""
-    minio_user = getattr(settings, "minio_user", "") or ""
-    minio_password = getattr(settings, "minio_password", "") or ""
-    if not minio_endpoint:
-        return False
-    try:
-        bucket, *key_parts = key.split("/", 1)
-        obj_key = key_parts[0] if key_parts else key
-        async with httpx.AsyncClient(timeout=30) as client:
-            # Ensure bucket exists first (PUT bucket)
-            await client.put(
-                f"http://{minio_endpoint}/{bucket}",
-                auth=(minio_user, minio_password),
-            )
-            resp = await client.put(
-                f"http://{minio_endpoint}/{bucket}/{obj_key}",
-                content=data,
-                headers={"Content-Type": content_type},
-                auth=(minio_user, minio_password),
-            )
-            return resp.status_code in (200, 204)
-    except Exception:
-        return False
 
 
 @router.post("/upload", response_model=VerifyJobOut, status_code=201)
@@ -72,7 +40,7 @@ async def upload_for_verify(
     await db.refresh(job)
 
     # Try to upload to MinIO (best-effort)
-    await _upload_to_minio(data, job.minio_key, content_type)
+    await upload_to_minio(data, job.minio_key, content_type)
 
     # Trigger async verification
     run_verify_pipeline.delay(str(job.id))

@@ -1,55 +1,58 @@
-.PHONY: up down build logs test test-unit lint type-check migrate migrate-create seed-dev deploy-staging install update restart
+.PHONY: up down build logs test test-unit lint type-check migrate migrate-create seed-dev install update restart ssl
+
+DEV  = docker compose -f docker-compose.dev.yml
+PROD = docker compose -f docker-compose.yml
 
 # ── Dev stack ──────────────────────────────────────────────────────────────────
 
 up:
-	docker compose -f docker-compose.dev.yml up -d
+	$(DEV) up -d
 
 down:
-	docker compose -f docker-compose.dev.yml down
+	$(DEV) down
 
 build:
-	docker compose -f docker-compose.dev.yml build api worker frontend
+	$(DEV) build api worker frontend
 
 logs:
-	docker compose -f docker-compose.dev.yml logs -f api worker
+	$(DEV) logs -f api worker
 
 restart-api:
-	docker compose -f docker-compose.dev.yml restart api worker
+	$(DEV) restart api worker
 
 # ── Testing ────────────────────────────────────────────────────────────────────
 
 test:
-	docker compose -f docker-compose.dev.yml exec api pytest app -v
+	$(DEV) exec api pytest app -v
 
 test-unit:
-	docker compose -f docker-compose.dev.yml exec api pytest app -m unit -v
+	$(DEV) exec api pytest app -m unit -v
 
 test-frontend:
-	docker compose -f docker-compose.dev.yml exec frontend pnpm test
+	$(DEV) exec frontend pnpm test
 
 # ── Linting ────────────────────────────────────────────────────────────────────
 
 lint:
-	docker compose -f docker-compose.dev.yml exec api ruff check app
-	docker compose -f docker-compose.dev.yml exec frontend pnpm lint
+	$(DEV) exec api ruff check app
+	$(DEV) exec frontend pnpm lint
 
 type-check:
-	docker compose -f docker-compose.dev.yml exec api mypy app --strict
-	docker compose -f docker-compose.dev.yml exec frontend pnpm type-check
+	$(DEV) exec api mypy app --strict
+	$(DEV) exec frontend pnpm type-check
 
-# ── Database ───────────────────────────────────────────────────────────────────
+# ── Database (dev) ─────────────────────────────────────────────────────────────
 
 migrate:
-	docker compose -f docker-compose.dev.yml exec api alembic upgrade head
+	$(DEV) exec api alembic upgrade head
 
 migrate-create:
-	docker compose -f docker-compose.dev.yml exec api alembic revision --autogenerate -m "$(msg)"
+	$(DEV) exec api alembic revision --autogenerate -m "$(msg)"
 
 seed-dev:
-	docker compose -f docker-compose.dev.yml exec api python -m app.seed
+	$(DEV) exec api python -m app.seed
 
-# ── Deploy ─────────────────────────────────────────────────────────────────────
+# ── Production deploy ──────────────────────────────────────────────────────────
 
 install:
 	@bash deploy.sh
@@ -60,13 +63,14 @@ update:
 restart:
 	@bash deploy.sh --restart
 
-# ── First-time setup (legacy) ───────────────────────────────────────────────────
+ssl:
+	@bash deploy.sh --ssl
 
-setup: up
-	@echo "Waiting for services to be ready..."
-	@sleep 8
-	@$(MAKE) migrate
-	@echo ""
-	@echo "✓ OSINT//DESK ready"
-	@echo "  API:      http://localhost:8000/docs"
-	@echo "  Frontend: http://localhost:3000"
+prod-logs:
+	$(PROD) logs -f api worker beat
+
+prod-status:
+	$(PROD) ps
+
+prod-migrate:
+	docker exec osint-api alembic -c /app/alembic.ini upgrade head

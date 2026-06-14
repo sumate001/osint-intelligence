@@ -11,6 +11,7 @@ class VerifyJobOut(BaseModel):
     file_type: str
     status: str
     file_size: int | None
+    feed_item_id: uuid.UUID | None
 
     # EXIF
     exif_data: dict

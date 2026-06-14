@@ -56,13 +56,23 @@ class RSSAdapter(BaseAdapter):
 
         published_at = self._parse_date(raw.get("published"))
 
-        media = []
+        from .base import MediaItem
+        media: list[MediaItem] = []
         for enc in raw.get("enclosures", []):
             media_type = enc.get("type", "")
-            if "image" in media_type:
-                media.append({"url": enc.get("href", ""), "media_type": "image"})
-            elif "video" in media_type:
-                media.append({"url": enc.get("href", ""), "media_type": "video"})
+            url = enc.get("href", "")
+            if url and "image" in media_type:
+                media.append(MediaItem(url=url, media_type="image"))
+            elif url and "video" in media_type:
+                media.append(MediaItem(url=url, media_type="video"))
+        # media_content (YouTube, podcasts, etc.)
+        for mc in raw.get("media_content", []):
+            media_type = mc.get("type", "")
+            url = mc.get("url", "")
+            if url and "image" in media_type and not any(m.url == url for m in media):
+                media.append(MediaItem(url=url, media_type="image"))
+            elif url and "video" in media_type and not any(m.url == url for m in media):
+                media.append(MediaItem(url=url, media_type="video"))
 
         return CanonicalFeedItem(
             external_id=raw["_entry_id"],
@@ -74,6 +84,7 @@ class RSSAdapter(BaseAdapter):
             published_at=published_at,
             source_weight=self.source_weight,
             verified_source=self.verified_source,
+            media=media,
             raw_metadata={
                 "author": raw.get("author"),
                 "tags": raw.get("tags", []),

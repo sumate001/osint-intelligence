@@ -1,0 +1,253 @@
+# OSINT//DESK — Production stack
+# ใช้งาน: ./deploy.sh
+# Dev:    docker compose -f docker-compose.dev.yml up -d
+
+name: osintdesk
+
+services:
+
+  # ── Reverse proxy ───────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: osint-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-www:/var/www/certbot:ro
+      - certbot-conf:/etc/letsencrypt:ro
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: osint-certbot
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-conf:/etc/letsencrypt
+    # รัน renew ทุก 12 ชั่วโมง
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done'
+    restart: unless-stopped
+
+  # ── Core infrastructure ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: osint-postgres
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-osintdesk}
+      POSTGRES_USER:     ${POSTGRES_USER:-osint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-osint}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: osint-redis
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: osint-neo4j
+    environment:
+      NEO4J_AUTH:     ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-changeme123}
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: osint-meili
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-changeme_master_key}
+      MEILI_ENV: production
+    volumes:
+      - meili-data:/meili_data
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: osint-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     ${MINIO_USER:-osint}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-changeme123}
+    ports:
+      - "9001:9001"   # console only — API internal
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: osint-searxng
+    volumes:
+      - ./config/searxng:/etc/searxng
+    environment:
+      SEARXNG_BASE_URL: http://localhost/searxng/
+    restart: unless-stopped
+
+  # ── Application ─────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: osint-api
+    env_file: .env
+    ports:
+      - "8000:8000"   # direct access for health checks + debugging
+    volumes:
+      - ./:/repo
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.ssh:/root/.ssh:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: osint-worker
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+      - api
+    command: celery -A app.worker worker --loglevel=info --concurrency=4
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: osint-beat
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+      - worker
+    command: celery -A app.worker beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        NEXT_PUBLIC_API_URL:         ""         # empty → Next.js rewrites handle /api/*
+        NEXT_PUBLIC_PERPLEXICA_URL:  ${NEXT_PUBLIC_PERPLEXICA_URL:-http://localhost:3002}
+    container_name: osint-frontend
+    environment:
+      NODE_ENV:              production
+      INTERNAL_API_URL:      http://api:8000
+      INTERNAL_SEARXNG_URL:  http://searxng:8080
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ── OSINT tools ─────────────────────────────────────────────────────
+  spiderfoot:
+    build:
+      context: https://github.com/smicallef/spiderfoot.git
+      dockerfile: Dockerfile
+    container_name: osint-spiderfoot
+    ports:
+      - "5001:5001"
+    volumes:
+      - spiderfoot-data:/var/lib/spiderfoot
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: osint-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: Asia/Bangkok
+    volumes:
+      - n8n-data:/home/node/.n8n
+    restart: unless-stopped
+
+  mirofish:
+    image: ghcr.io/666ghj/mirofish:latest
+    container_name: osint-mirofish
+    ports:
+      - "5002:5001"
+      - "5003:3000"
+    environment:
+      LLM_API_KEY:      "ollama"
+      LLM_BASE_URL:     "http://host.docker.internal:11434/v1"
+      LLM_MODEL_NAME:   "${OLLAMA_DEFAULT_MODEL:-qwen3:8b}"
+      ZEP_API_KEY:      "${ZEP_API_KEY:-}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - mirofish-uploads:/app/backend/uploads
+    restart: unless-stopped
+
+  perplexica:
+    image: itzcrazykns1337/vane:latest
+    container_name: osint-perplexica
+    ports:
+      - "3002:3000"
+    volumes:
+      - perplexica-data:/home/vane/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - searxng
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  redis-data:
+  neo4j-data:
+  meili-data:
+  minio-data:
+  spiderfoot-data:
+  n8n-data:
+  mirofish-uploads:
+  perplexica-data:
+  certbot-www:
+  certbot-conf:

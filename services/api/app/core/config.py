@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     brief_model: str = "qwen3:14b"
     vision_model: str = "gemma3:27b"
     simulation_model: str = "qwen3:14b"
+    whisper_model: str = "whisper"
 
     # Auth
     secret_key: str = "change_this_to_a_random_secret_key"
