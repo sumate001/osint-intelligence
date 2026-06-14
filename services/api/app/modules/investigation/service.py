@@ -126,7 +126,9 @@ async def cancel_scan(db: AsyncSession, scan: CaseScan) -> CaseScan:
         if sf_url:
             try:
                 async with httpx.AsyncClient(timeout=5) as client:
-                    await client.get(f"{sf_url}/scan/{scan.external_id}/abort")
+                    # SpiderFoot abort: GET /stopscan?id=...
+                    await client.get(f"{sf_url}/stopscan", params={"id": scan.external_id},
+                                     headers={"Accept": "application/json"})
             except Exception:
                 pass
 

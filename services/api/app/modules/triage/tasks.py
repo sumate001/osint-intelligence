@@ -141,6 +141,24 @@ async def _ingest_source(source_id: str):
                 media=[m.model_dump() for m in canonical.media],
             )
             db.add(feed_item)
+            # Index in Meilisearch for full-text search
+            from ...core.search import index_item
+            index_item(str(feed_item.id) if feed_item.id else canonical.external_id, {
+                "title": feed_item.title or "",
+                "body": (feed_item.body or "")[:2000],
+                "source_name": feed_item.source_name or "",
+                "source_id": str(feed_item.source_id or ""),
+                "source_type": feed_item.source_type or "",
+                "verdict": feed_item.verdict or "",
+                "total_score": float(feed_item.total_score or 0),
+                "is_archived": bool(feed_item.is_archived),
+                "published_at": feed_item.published_at.isoformat() if feed_item.published_at else "",
+                "ingested_at": feed_item.ingested_at.isoformat() if feed_item.ingested_at else "",
+                "entities": " ".join(
+                    e.get("name", e.get("value", "")) for e in (feed_item.entities or [])
+                    if isinstance(e, dict)
+                ),
+            })
             new_count += 1
 
         source.last_fetched_at = datetime.now(timezone.utc)

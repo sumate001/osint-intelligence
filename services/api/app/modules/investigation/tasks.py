@@ -49,9 +49,9 @@ async def _run_scan(scan_id: str) -> None:
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
-                # Create SpiderFoot scan
+                # Create SpiderFoot scan — /startscan returns ["SUCCESS", scanId] as JSON
                 resp = await client.post(
-                    f"{spiderfoot_url}/scan/new",
+                    f"{spiderfoot_url}/startscan",
                     data={
                         "scanname": f"case-{scan.case_id}-{scan_id[:8]}",
                         "scantarget": scan.target,
@@ -59,12 +59,15 @@ async def _run_scan(scan_id: str) -> None:
                         "modulelist": "",
                         "typelist": "",
                     },
+                    headers={"Accept": "application/json"},
                 )
                 if resp.status_code != 200:
                     raise RuntimeError(f"SpiderFoot returned {resp.status_code}")
 
-                sf_data = resp.json()
-                sf_scan_id = sf_data.get("id") or sf_data.get("scanId", "")
+                sf_data = resp.json()   # ["SUCCESS", "scanId..."]
+                if not isinstance(sf_data, list) or sf_data[0] != "SUCCESS":
+                    raise RuntimeError(f"SpiderFoot error: {sf_data}")
+                sf_scan_id = sf_data[1]
                 scan.external_id = sf_scan_id
                 await db.commit()
 
@@ -81,19 +84,24 @@ async def _run_scan(scan_id: str) -> None:
                         return
 
                 async with httpx.AsyncClient(timeout=15) as client:
+                    # /scanstatus?id=... returns [name, target, created, started, ended, status, riskmatrix]
                     status_resp = await client.get(
-                        f"{spiderfoot_url}/scan/{sf_scan_id}/status"
+                        f"{spiderfoot_url}/scanstatus",
+                        params={"id": sf_scan_id},
+                        headers={"Accept": "application/json"},
                     )
                     status_data = status_resp.json()
-                    sf_status = status_data.get("status", "RUNNING")
+                    sf_status = status_data[5] if isinstance(status_data, list) and len(status_data) > 5 else "RUNNING"
 
-                if sf_status in ("FINISHED", "ABORTED", "ERROR"):
+                if sf_status in ("FINISHED", "ABORTED", "ERROR-FAILED"):
                     break
 
-            # Fetch results
+            # Fetch results — /scaneventresults?id=... returns list of event arrays
             async with httpx.AsyncClient(timeout=30) as client:
                 results_resp = await client.get(
-                    f"{spiderfoot_url}/scan/{sf_scan_id}/results/all"
+                    f"{spiderfoot_url}/scaneventresults",
+                    params={"id": sf_scan_id},
+                    headers={"Accept": "application/json"},
                 )
                 entities = results_resp.json() if results_resp.status_code == 200 else []
 

@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     # External OSINT tools
     spiderfoot_url: str = ""
+    mirofish_url: str = ""   # when set, simulation uses MiroFish; else LLM fallback
     perplexica_url: str = "http://localhost:3001"
     searxng_url: str = "http://localhost:8080"
 

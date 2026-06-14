@@ -158,33 +158,12 @@ async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
         ("SearXNG",      "http://searxng:8080/"),
         ("Neo4j",        "http://neo4j:7474"),
         ("SpiderFoot",   "http://spiderfoot:5001/"),
-        ("MiroFish",     "http://mirofish:5001/"),
+        ("MiroFish",     "http://mirofish:5001/health"),
+        ("Perplexica",   "http://perplexica:3000/"),
         ("n8n",          "http://n8n:5678/healthz"),
     ]
     async with httpx.AsyncClient(timeout=3.0) as client:
         for name, url in core_http:
-            t0 = time.monotonic()
-            try:
-                resp = await client.get(url)
-                latency = round((time.monotonic() - t0) * 1000, 1)
-                if resp.status_code < 400:
-                    results.append(ServiceHealth(name=name, status="ok", latency_ms=latency))
-                else:
-                    results.append(ServiceHealth(name=name, status="error", latency_ms=latency, detail=f"HTTP {resp.status_code}"))
-            except Exception as exc:
-                latency = round((time.monotonic() - t0) * 1000, 1)
-                results.append(ServiceHealth(name=name, status="error", latency_ms=latency, detail=str(exc)[:120]))
-
-        # ── Optional add-ons: only check if base URL is a real host ───────
-        # Build URL from base + path so an empty base doesn't sneak through
-        optional: list[tuple[str, str, str]] = [
-            ("Perplexica", settings_merged.perplexica.url, "/api/health"),
-        ]
-        for name, base, path in optional:
-            if not base or "localhost" in base or "127.0.0.1" in base:
-                results.append(ServiceHealth(name=name, status="unknown", detail="not configured"))
-                continue
-            url = f"{base.rstrip('/')}{path}"
             t0 = time.monotonic()
             try:
                 resp = await client.get(url)

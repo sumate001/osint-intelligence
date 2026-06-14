@@ -129,45 +129,29 @@ services:
     container_name: osint-mirofish
     ports:
       - "5002:5001"                              # backend: internal 5001 → host 5002
-      - "5003:3000"                              # frontend: internal 3000 → host 5003 (3000 ถูก OSINT frontend ใช้)
+      - "5003:3000"                              # frontend: internal 3000 → host 5003
     environment:
-      LLM_API_KEY: "ollama"                      # Ollama ไม่ต้องการ key จริง
+      LLM_API_KEY: "ollama"
       LLM_BASE_URL: "http://host.docker.internal:11434/v1"
       LLM_MODEL_NAME: "${OLLAMA_DEFAULT_MODEL:-qwen3.5:latest}"
-      ZEP_API_KEY: "${ZEP_API_KEY:-}"            # ใส่ใน .env — รับฟรีที่ https://app.getzep.com/
+      ZEP_API_KEY: "${ZEP_API_KEY:-}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - mirofish-uploads:/app/backend/uploads
     restart: unless-stopped
 
-  perplexica-backend:
-    build:
-      context: https://github.com/ItzCrazyKns/Perplexica.git
-      dockerfile: app.dockerfile
-    container_name: osint-perplexica-backend
+  perplexica:
+    image: itzcrazykns1337/vane:latest
+    container_name: osint-perplexica
     ports:
-      - "3001:3001"                              # Perplexica API + WebSocket
+      - "3002:3000"                              # 3000 ถูก OSINT frontend ใช้แล้ว → map ไป 3002
     volumes:
-      - ./services/perplexica/config.toml:/home/perplexica/config.toml:ro
+      - perplexica-data:/home/vane/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - searxng
-    restart: unless-stopped
-
-  perplexica-frontend:
-    build:
-      context: https://github.com/ItzCrazyKns/Perplexica.git
-      dockerfile: ui.dockerfile
-    container_name: osint-perplexica-frontend
-    ports:
-      - "3002:3000"                              # 3000 ถูก OSINT frontend ใช้แล้ว → map ไป 3002
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
-      - NEXT_PUBLIC_WS_URL=ws://localhost:3001
-    depends_on:
-      - perplexica-backend
     restart: unless-stopped
 
   api:
@@ -236,10 +220,10 @@ services:
       - ./services/frontend:/app
       - /app/node_modules
     environment:
-      INTERNAL_API_URL: http://api:8000          # server-side → Docker network
-      INTERNAL_SEARXNG_URL: http://searxng:8080  # server-side → Docker network
-      NEXT_PUBLIC_API_URL: http://localhost:8000  # kept for SSR fallback
-      NEXT_PUBLIC_PERPLEXICA_URL: http://localhost:3002    # Perplexica UI (port 3002)
+      INTERNAL_API_URL: http://api:8000
+      INTERNAL_SEARXNG_URL: http://searxng:8080
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_PERPLEXICA_URL: http://localhost:3002
     depends_on:
       - api
     command: pnpm dev
@@ -254,3 +238,4 @@ volumes:
   spiderfoot-data:
   n8n-data:
   mirofish-uploads:
+  perplexica-data:

@@ -64,13 +64,31 @@ async def list_items(
         q = q.where(FeedItem.verdict == verdict.upper())
     if source_id:
         q = q.where(FeedItem.source_id == source_id)
+
+    meili_ids: list[str] | None = None
     if search:
-        q = q.where(
-            or_(
-                FeedItem.title.ilike(f"%{search}%"),
-                FeedItem.body.ilike(f"%{search}%"),
+        from ...core.search import search_items
+        filters = f"is_archived = {str(is_archived).lower()}"
+        if verdict:
+            filters += f" AND verdict = {verdict.upper()}"
+        meili_ids = search_items(search, filters=filters, limit=500)
+        if meili_ids:
+            import uuid as _uuid
+            valid_ids = []
+            for mid in meili_ids:
+                try:
+                    valid_ids.append(_uuid.UUID(mid))
+                except ValueError:
+                    pass
+            q = select(FeedItem).where(FeedItem.id.in_(valid_ids), FeedItem.is_archived == is_archived)
+        else:
+            # Meilisearch unavailable or no results — SQL fallback
+            q = q.where(
+                or_(
+                    FeedItem.title.ilike(f"%{search}%"),
+                    FeedItem.body.ilike(f"%{search}%"),
+                )
             )
-        )
 
     # total count
     count_q = select(func.count()).select_from(q.subquery())
