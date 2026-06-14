@@ -2,7 +2,7 @@ const th = {
   nav: {
     today: "Today's Intel",
     investigation: "สืบสวน",
-    verify: "ตรวจสอบสื่อ",
+    verify: "ตรวจสอบ Media",
     brief: "รายงาน",
     intelligence: "ข่าวกรอง",
     simulation: "จำลองสถานการณ์",
@@ -112,7 +112,7 @@ const th = {
     create_brief: "สร้าง Brief",
   },
   verify: {
-    title: "ตรวจสอบสื่อ",
+    title: "ตรวจสอบ Media",
     drop_hint: "ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์",
     url_placeholder: "หรือวาง URL ที่ต้องการตรวจสอบ...",
     verify_btn: "ตรวจสอบ",
