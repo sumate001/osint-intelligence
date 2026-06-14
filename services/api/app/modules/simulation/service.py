@@ -16,7 +16,7 @@ async def create_job(db: AsyncSession, data: SimCreate, user_id: str) -> Simulat
         created_by=user_id,
     )
     db.add(job)
-    await db.flush()
+    await db.commit()  # commit before returning so Celery task can find the row
     await db.refresh(job)
     return job
 

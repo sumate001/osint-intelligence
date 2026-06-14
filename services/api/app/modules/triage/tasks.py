@@ -90,14 +90,14 @@ async def _ingest_source(source_id: str):
 
         new_count = 0
         for canonical in items:
-            # Dedup check
-            exists = await db.execute(
-                select(FeedItem).where(
+            # Dedup check — use limit(1) + scalar to avoid MultipleResultsFound
+            exists = (await db.execute(
+                select(FeedItem.id).where(
                     FeedItem.external_id == canonical.external_id,
                     FeedItem.source_id == canonical.source_id,
-                )
-            )
-            if exists.scalar_one_or_none():
+                ).limit(1)
+            )).scalar_one_or_none()
+            if exists:
                 continue
 
             # LLM triage scoring

@@ -370,6 +370,17 @@ export default function SimulationPage() {
               <div className="flex-1 overflow-y-auto p-6">
                 {resultTab === "scenarios" && (
                   <div className="space-y-4">
+                    {scenarios.length === 0 && (
+                      <div className="bg-[var(--red)]/10 border border-[var(--red)]/30 rounded-xl p-5 text-center space-y-2">
+                        <p className="text-sm font-medium text-[var(--red)]">วิเคราะห์ไม่สำเร็จ</p>
+                        <p className="text-xs text-[var(--text-3)] leading-relaxed">
+                          {coverageStrategy || "LLM ใช้เวลาเกิน timeout หรือเกิด error — ลองรันใหม่อีกครั้ง"}
+                        </p>
+                        <p className="text-[10px] text-[var(--text-3)]">
+                          แนะนำ: เพิ่ม verified evidence และ entity ให้มากขึ้นก่อนรัน
+                        </p>
+                      </div>
+                    )}
                     {(scenarios as Array<{
                       type: string; label: string; probability: number;
                       timeline_weeks: string; bullets: string[];

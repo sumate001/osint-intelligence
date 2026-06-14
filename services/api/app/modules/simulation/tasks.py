@@ -146,8 +146,9 @@ Config: agents={config.get('agents', 1000)}, timeframe={config.get('timeframe', 
 
     try:
         result = await chat_json(messages, module="simulation")
-    except Exception:
-        result = {"confidence": "LOW", "scenarios": [], "signals": [], "timeline": [], "pivot_points": [], "coverage_strategy": "ไม่สามารถวิเคราะห์ได้"}
+    except Exception as exc:
+        log.error("Simulation LLM call failed for job %s: %s", job_id, exc)
+        result = {"confidence": "LOW", "scenarios": [], "signals": [], "timeline": [], "pivot_points": [], "coverage_strategy": "ไม่สามารถวิเคราะห์ได้ — LLM error: " + str(exc)[:200]}
 
     await _set_step(job_id, 5, SessionLocal)
     async with SessionLocal() as db:
