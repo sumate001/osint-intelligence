@@ -41,11 +41,32 @@ function AuthImage({ src, className, fallback }: { src: string; className?: stri
 
 function FileTypeThumb({ job }: { job: VerifyJob }) {
   const exif = job.exif_data as Record<string, unknown>;
-  const shotCount = Array.isArray(exif?.KeyframeAnalysis) ? (exif.KeyframeAnalysis as unknown[]).length : 0;
+  const frames = Array.isArray(exif?.KeyframeAnalysis) ? (exif.KeyframeAnalysis as Array<{ minio_key?: string }>) : [];
+  const hasFrames = frames.length > 0 && !!frames[0]?.minio_key;
   const isProcessing = job.status === "PENDING" || job.status === "PROCESSING";
 
   if (job.file_type === "image") {
     return <AuthImage src={`/api/v1/verify/jobs/${job.id}/media`} className="w-full h-full" />;
+  }
+
+  if (job.file_type === "video" && hasFrames) {
+    return (
+      <div className="relative w-full h-full">
+        <AuthImage
+          src={`/api/v1/verify/jobs/${job.id}/frames/0`}
+          className="w-full h-full"
+          fallback={
+            <div className="w-full h-full rounded-lg bg-[var(--surface-2)] flex items-center justify-center">
+              <Film size={22} className="text-[var(--accent)]" />
+            </div>
+          }
+        />
+        {/* Film badge overlay */}
+        <span className="absolute bottom-1 right-1 flex items-center gap-0.5 px-1 py-0.5 rounded bg-black/60 text-[8px] text-white font-mono">
+          <Film size={7} /> {frames.length}
+        </span>
+      </div>
+    );
   }
 
   if (isProcessing) {
@@ -59,10 +80,7 @@ function FileTypeThumb({ job }: { job: VerifyJob }) {
   return (
     <div className="w-full h-full rounded-lg bg-[var(--surface-2)] flex flex-col items-center justify-center gap-1.5">
       {job.file_type === "video" ? (
-        <>
-          <Film size={24} className="text-[var(--accent)]" />
-          {shotCount > 0 && <span className="text-[9px] text-[var(--text-3)]">{shotCount} ช็อท</span>}
-        </>
+        <Film size={24} className="text-[var(--accent)]" />
       ) : (
         <Music size={24} className="text-[var(--teal)]" />
       )}
