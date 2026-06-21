@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     brief_model: str = "qwen3:14b"
     vision_model: str = "gemma3:27b"
     simulation_model: str = "qwen3:14b"
+    requirements_model: str = "qwen3:8b"
+    deception_model: str = "qwen3:8b"
+    darkweb_model: str = "qwen3:8b"
     whisper_model: str = "whisper"
 
     # Auth

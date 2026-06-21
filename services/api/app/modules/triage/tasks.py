@@ -8,7 +8,7 @@ from ...core.config import get_settings
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name="triage.poll_all_sources", bind=True)
+@celery_app.task(name="triage.poll_all_sources", bind=True, queue="triage")
 def poll_all_sources_task(self):
     """Beat task: check all active sources and trigger ingestion if interval elapsed."""
     asyncio.run(_poll_all())
@@ -39,6 +39,7 @@ async def _poll_all():
     max_retries=3,
     default_retry_delay=60,
     acks_late=True,
+    queue="triage",
 )
 def ingest_source_task(self, source_id: str):
     """Fetch from a single source and score all new items."""
@@ -89,10 +90,11 @@ async def _ingest_source(source_id: str):
             return
 
         new_count = 0
+        new_feed_items: list[FeedItem] = []
         media_to_verify: list[tuple[str, list]] = []  # (feed_item_id, media_items)
 
         for canonical in items:
-            # Dedup check — use limit(1) + scalar to avoid MultipleResultsFound
+            # Dedup check — external_id within same source
             exists = (await db.execute(
                 select(FeedItem.id).where(
                     FeedItem.external_id == canonical.external_id,
@@ -101,6 +103,14 @@ async def _ingest_source(source_id: str):
             )).scalar_one_or_none()
             if exists:
                 continue
+
+            # Cross-source URL dedup — skip if same URL already ingested from any source
+            if canonical.url:
+                url_exists = (await db.execute(
+                    select(FeedItem.id).where(FeedItem.url == canonical.url).limit(1)
+                )).scalar_one_or_none()
+                if url_exists:
+                    continue
 
             # LLM triage scoring
             try:
@@ -143,6 +153,7 @@ async def _ingest_source(source_id: str):
                 media=[m.model_dump() for m in canonical.media],
             )
             db.add(feed_item)
+            new_feed_items.append(feed_item)
             # Index in Meilisearch for full-text search
             from ...core.search import index_item
             index_item(str(feed_item.id) if feed_item.id else canonical.external_id, {
@@ -171,8 +182,104 @@ async def _ingest_source(source_id: str):
         await db.commit()
         logger.info("Source %s: stored %d new items", source_id, new_count)
 
+    # Dispatch PIR auto-match — only for actionable verdicts, not PASS
+    _PIR_VERDICTS = {"PRIORITY", "INVESTIGATE", "FAST_TRACK"}
+    if new_feed_items:
+        from ...modules.requirements.tasks import match_pir_task
+        for fi in new_feed_items:
+            if fi.title and fi.verdict in _PIR_VERDICTS:
+                match_pir_task.delay(fi.title, fi.body or "", source="feed")
+
     if media_to_verify:
         await _maybe_auto_verify(media_to_verify, AsyncSessionLocal)
+
+    if new_feed_items:
+        await _maybe_auto_investigate(new_feed_items, AsyncSessionLocal)
+
+
+async def _maybe_auto_investigate(
+    new_feed_items: list,
+    SessionLocal,
+) -> None:
+    """If auto_investigate is enabled, create investigation cases for actionable items.
+    If auto_scan is also enabled, trigger SpiderFoot on extracted entities."""
+    from ...modules.admin.models import SystemSettings
+    from sqlalchemy import select
+
+    async with SessionLocal() as db:
+        row = (await db.execute(select(SystemSettings).where(SystemSettings.id == 1))).scalar_one_or_none()
+
+    if not row:
+        return
+    automation = row.data.get("automation", {})
+    if not automation.get("enabled", False):
+        return
+
+    steps = automation.get("steps", {})
+    do_investigate = steps.get("auto_investigate", False)
+    do_scan = steps.get("auto_scan", False)
+
+    if not do_investigate:
+        return
+
+    _ACTIONABLE = {"PRIORITY", "INVESTIGATE", "FAST_TRACK"}
+    candidates = [fi for fi in new_feed_items if fi.verdict in _ACTIONABLE]
+    if not candidates:
+        return
+
+    from ...modules.investigation.models import Case, CaseScan
+    from ...modules.investigation.tasks import run_spiderfoot_scan
+
+    async with SessionLocal() as db:
+        for fi in candidates:
+            # Skip if a case already exists for this feed item
+            existing = (await db.execute(
+                select(Case).where(Case.feed_item_id == str(fi.id)).limit(1)
+            )).scalar_one_or_none()
+            if existing:
+                continue
+
+            case = Case(
+                title=fi.title or "Untitled",
+                description=fi.verdict_reason or "",
+                feed_item_id=str(fi.id),
+                tags=[fi.verdict],
+                created_by="autopilot",
+            )
+            db.add(case)
+            await db.flush()
+            await db.refresh(case)
+            logger.info("auto_investigate: created case %s for feed_item %s", case.id, fi.id)
+
+            if do_scan:
+                # SpiderFoot accepts: domain, IP, email — NOT full URLs or plain names
+                from urllib.parse import urlparse
+                import re as _re
+                _domain_re = _re.compile(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
+
+                targets: list[str] = []
+                # Primary: domain extracted from article URL
+                if fi.url:
+                    parsed = urlparse(fi.url)
+                    netloc = parsed.netloc.lstrip("www.")
+                    if netloc and _domain_re.match(netloc):
+                        targets.append(netloc)
+                # Secondary: entity strings that look like domains
+                entities = fi.entities or {}
+                for entity_list in [entities.get("organizations") or [], entities.get("persons") or []]:
+                    for e in entity_list[:3]:
+                        if isinstance(e, str) and _domain_re.match(e.strip()):
+                            targets.append(e.strip())
+
+                for target in list(dict.fromkeys(targets))[:2]:  # dedupe, max 2 scans
+                    scan = CaseScan(case_id=case.id, target=target, scan_type="spiderfoot")
+                    db.add(scan)
+                    await db.flush()
+                    await db.refresh(scan)
+                    run_spiderfoot_scan.delay(str(scan.id))
+                    logger.info("auto_scan: queued scan %s → %s", scan.id, target)
+
+        await db.commit()
 
 
 async def _maybe_auto_verify(

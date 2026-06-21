@@ -82,9 +82,11 @@ async def score_item(item: CanonicalFeedItem) -> TriageScores:
     ]
 
     try:
-        result = await chat_json(messages, module="triage")
+        from ..admin.service import get_effective_model
+        model = await get_effective_model("triage")
+        result = await chat_json(messages, module="triage", model=model)
     except Exception as e:
-        logger.warning("LLM triage failed for %s: %s — using fallback scores", item.external_id, e)
+        logger.warning("LLM triage failed for %s: %s(%s) — using fallback scores", item.external_id, type(e).__name__, e)
         result = _fallback_scores(item)
 
     # Validate and normalise

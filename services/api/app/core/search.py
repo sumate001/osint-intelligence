@@ -20,6 +20,11 @@ def _get_client() -> meilisearch.Client | None:
     key = getattr(settings, "meili_master_key", "") or ""
     try:
         _client = meilisearch.Client(url, key)
+        # Ensure index exists with explicit primary key to avoid ambiguity with source_id
+        try:
+            _client.create_index(INDEX_NAME, {"primaryKey": "id"})
+        except Exception:
+            pass  # already exists
         idx = _client.index(INDEX_NAME)
         idx.update_settings({
             "searchableAttributes": ["title", "body", "source_name", "entities"],
@@ -40,7 +45,7 @@ def index_item(item_id: str, doc: dict) -> None:
         return
     try:
         doc["id"] = item_id
-        client.index(INDEX_NAME).add_documents([doc])
+        client.index(INDEX_NAME).add_documents([doc], primary_key="id")
     except Exception as exc:
         log.warning("Meilisearch index failed for %s: %s", item_id, exc)
 

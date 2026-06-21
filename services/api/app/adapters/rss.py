@@ -1,5 +1,7 @@
 import hashlib
+import html
 import logging
+import re
 from datetime import datetime, timezone
 from typing import AsyncIterator
 import feedparser
@@ -11,6 +13,17 @@ logger = logging.getLogger(__name__)
 
 # feedparser returns structs, not plain dicts — wrap to satisfy type hints
 _Struct = object
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html(text: str) -> str:
+    """Remove HTML tags and decode entities. Google News RSS embeds <a> tags in titles."""
+    if not text:
+        return ""
+    text = _TAG_RE.sub(" ", text)
+    text = html.unescape(text)
+    return " ".join(text.split())
 
 
 class RSSAdapter(BaseAdapter):
@@ -50,7 +63,7 @@ class RSSAdapter(BaseAdapter):
             }
 
     def transform(self, raw: dict) -> CanonicalFeedItem:
-        title = raw.get("title", "").strip()
+        title = _strip_html(raw.get("title", ""))
         if not title:
             raise TransformError("Missing title")
 
@@ -79,7 +92,7 @@ class RSSAdapter(BaseAdapter):
             source_id=self.source_id,
             source_type=SourceType.RSS,
             title=title,
-            body=raw.get("summary", ""),
+            body=_strip_html(raw.get("summary", "")),
             url=raw.get("link"),
             published_at=published_at,
             source_weight=self.source_weight,

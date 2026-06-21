@@ -106,7 +106,9 @@ async def llm_draft_brief(db: AsyncSession, brief: Brief) -> Brief:
 
     try:
         import uuid as _uuid2
-        parsed = await chat_json(messages, module="brief")
+        from ..admin.service import get_effective_model
+        effective_model = await get_effective_model("brief")
+        parsed = await chat_json(messages, module="brief", model=effective_model)
         if parsed:
             sections = []
             for key, section_title, stype in [

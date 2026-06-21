@@ -32,7 +32,9 @@ async def run_check(db: AsyncSession, data: DeceptionCheckCreate, user_id: str) 
                 '"risk_level":"LOW or MEDIUM or HIGH","flagged":true_or_false,"flag_reason":"reason if flagged"}'
             )},
         ]
-        parsed = await chat_json(messages, module="triage")
+        from ..admin.service import get_effective_model
+        effective_model = await get_effective_model("deception")
+        parsed = await chat_json(messages, module="deception", model=effective_model)
         if parsed:
             # coerce to str — model sometimes returns booleans for text fields
             def _s(v: object) -> str | None:

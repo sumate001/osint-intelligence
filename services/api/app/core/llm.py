@@ -16,6 +16,9 @@ def get_model_for_module(module: str) -> str:
         "brief": settings.brief_model,
         "vision": settings.vision_model,
         "simulation": settings.simulation_model,
+        "requirements": settings.requirements_model,
+        "deception": settings.deception_model,
+        "darkweb": settings.darkweb_model,
         "default": settings.ollama_default_model,
     }
     return routing.get(module, routing["default"])
@@ -24,6 +27,7 @@ def get_model_for_module(module: str) -> str:
 TIMEOUT_BY_MODULE: dict[str, float] = {
     "simulation": 600.0,  # simulation prompt is large; 10min ceiling
     "brief": 300.0,
+    "requirements": 360.0,  # EEI generation + matching can be slow when LLM is busy
     "default": 120.0,
 }
 

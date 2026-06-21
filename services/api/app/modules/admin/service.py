@@ -31,6 +31,9 @@ async def get_settings_merged(db: AsyncSession) -> AllSettings:
             "brief_model": env.brief_model,
             "vision_model": env.vision_model,
             "simulation_model": env.simulation_model,
+            "requirements_model": env.requirements_model,
+            "deception_model": env.deception_model,
+            "darkweb_model": env.darkweb_model,
         },
         searxng={"url": env.searxng_url},
         perplexica={"url": env.perplexica_url},
@@ -204,6 +207,50 @@ async def get_logs(
     if level and level != "all":
         q = q.where(SystemLog.level == level)
     return list((await db.execute(q)).scalars().all())
+
+
+async def get_effective_model(module: str) -> str:
+    """Return the DB-overridden model for a module, falling back to env.
+    Celery tasks call this with their own session so UI changes take effect immediately."""
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from sqlalchemy.pool import NullPool
+    env = get_settings()
+    env_fallback = {
+        "triage": env.triage_model,
+        "brief": env.brief_model,
+        "vision": env.vision_model,
+        "simulation": env.simulation_model,
+        "requirements": env.requirements_model,
+        "deception": env.deception_model,
+        "darkweb": env.darkweb_model,
+    }.get(module, env.ollama_default_model)
+
+    try:
+        engine = create_async_engine(env.postgres_url, poolclass=NullPool)
+        Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with Session() as db:
+            row = (await db.execute(select(SystemSettings).where(SystemSettings.id == 1))).scalar_one_or_none()
+        await engine.dispose()
+        if row and row.data:
+            routing = row.data.get("model_routing", {})
+            key = f"{module}_model"
+            if key in routing and routing[key]:
+                return routing[key]
+    except Exception:
+        pass
+    return env_fallback
+
+
+async def list_ollama_models(ollama_url: str) -> list[str]:
+    """Fetch available model names from Ollama."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{ollama_url.rstrip('/')}/api/tags")
+            resp.raise_for_status()
+            data = resp.json()
+            return sorted(m["name"] for m in data.get("models", []))
+    except Exception:
+        return []
 
 
 async def write_log(db: AsyncSession, level: str, service: str, message: str, detail: dict | None = None) -> None:

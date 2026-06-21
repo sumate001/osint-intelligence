@@ -73,3 +73,12 @@ export function useCheckForUpdates() {
     onSuccess: (data) => qc.setQueryData(["system-version"], data),
   });
 }
+
+export function useOllamaModels() {
+  return useQuery({
+    queryKey: ["ollama-models"],
+    queryFn: api.getOllamaModels,
+    staleTime: 60_000,
+    retry: false,
+  });
+}

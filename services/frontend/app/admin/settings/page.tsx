@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useAdminSettings, useSaveSettings, useAdminUsers, useCreateUser, useUpdateUser, useDeleteUser, useServiceHealth, useSystemLogs, useSystemVersion, useCheckForUpdates } from "@/lib/hooks/useAdmin";
+import { useAdminSettings, useSaveSettings, useAdminUsers, useCreateUser, useUpdateUser, useDeleteUser, useServiceHealth, useSystemLogs, useSystemVersion, useCheckForUpdates, useOllamaModels } from "@/lib/hooks/useAdmin";
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils/cn";
 import type { AdminSettings, SettingsPatch, AdminUser, UserCreate } from "@/lib/api/admin";
-import { Save, RefreshCw, Plus, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle, Download, Eye, EyeOff, ExternalLink, Globe, Zap, ChevronRight } from "lucide-react";
+import { Save, RefreshCw, Plus, Trash2, Pencil, CheckCircle2, XCircle, AlertCircle, Download, Eye, EyeOff, ExternalLink, Globe, Zap, ChevronRight, ChevronDown, Check, Loader2 } from "lucide-react";
 import { useT } from "@/lib/hooks/useT";
 import { useLocaleStore } from "@/lib/stores/locale";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n";
@@ -132,13 +132,13 @@ function AISection({ s, set }: { s: AdminSettings["ai"]; set: (v: AdminSettings[
         <Field label="Ollama Base URL">
           <input value={s.ollama_base_url} onChange={e => f("ollama_base_url")(e.target.value)} className={inputCls} placeholder="http://host.docker.internal:11434" />
         </Field>
-        <Field label="Default Model">
-          <input value={s.ollama_default_model} onChange={e => f("ollama_default_model")(e.target.value)} className={inputCls} placeholder="qwen3:8b" />
+        <Field label="Default Model" note="Fallback เมื่อไม่ได้กำหนด model ของ module">
+          <ModelSelect value={s.ollama_default_model} onChange={v => f("ollama_default_model")(v)} />
         </Field>
-        <Field label="Vision Model">
-          <input value={s.vision_model} onChange={e => f("vision_model")(e.target.value)} className={inputCls} placeholder="gemma3:27b" />
+        <Field label="Vision Model" note="วิเคราะห์รูปภาพ/วิดีโอ — ต้องรองรับ multimodal">
+          <ModelSelect value={s.vision_model} onChange={v => f("vision_model")(v)} />
         </Field>
-        <Field label="Embed Model">
+        <Field label="Embed Model" note="สำหรับ vector search — ไม่ใช่ chat model">
           <input value={s.embed_model} onChange={e => f("embed_model")(e.target.value)} className={inputCls} placeholder="nomic-embed-text" />
         </Field>
         <Field label="Max Concurrent Requests">
@@ -159,24 +159,130 @@ function AISection({ s, set }: { s: AdminSettings["ai"]; set: (v: AdminSettings[
   );
 }
 
+// ─── Model selector with datalist ────────────────────────────────────────────
+function ModelSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: models = [], isLoading } = useOllamaModels();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const filtered = query
+    ? models.filter(m => m.toLowerCase().includes(query.toLowerCase()))
+    : models;
+
+  const select = (m: string) => {
+    onChange(m);
+    setOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      {/* trigger button */}
+      <button
+        type="button"
+        onClick={() => { setOpen(v => !v); setQuery(""); }}
+        className="w-full flex items-center justify-between gap-2 bg-[var(--surface-2)] border border-[var(--border)] rounded px-3 py-2 text-sm text-left hover:border-[var(--border-2)] transition-colors focus:outline-none focus:border-[var(--accent)]"
+      >
+        <span className={value ? "text-[var(--text)] font-mono text-xs" : "text-[var(--text-3)]"}>
+          {value || "เลือก model…"}
+        </span>
+        {isLoading
+          ? <Loader2 size={13} className="shrink-0 text-[var(--text-3)] animate-spin" />
+          : <ChevronDown size={13} className={cn("shrink-0 text-[var(--text-3)] transition-transform", open && "rotate-180")} />
+        }
+      </button>
+
+      {/* dropdown panel */}
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-lg border border-[var(--border-2)] bg-[var(--surface)] shadow-xl overflow-hidden">
+          {/* search */}
+          <div className="p-2 border-b border-[var(--border)]">
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="ค้นหา model…"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded px-2.5 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--text-3)] outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+
+          {/* model list */}
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-[var(--text-3)]">
+                {models.length === 0 ? "Ollama ไม่ตอบสนอง" : "ไม่พบ model"}
+              </div>
+            ) : (
+              filtered.map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => select(m)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[var(--surface-3)] transition-colors font-mono",
+                    m === value ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-[var(--text-2)]"
+                  )}
+                >
+                  {m}
+                  {m === value && <Check size={10} className="shrink-0 text-[var(--accent)]" />}
+                </button>
+              ))
+            )}
+          </div>
+
+          {/* custom value entry */}
+          {query && !models.includes(query) && (
+            <div className="border-t border-[var(--border)] p-2">
+              <button
+                type="button"
+                onClick={() => select(query)}
+                className="w-full text-left text-xs text-[var(--accent)] px-2 py-1.5 hover:bg-[var(--accent)]/5 rounded transition-colors"
+              >
+                ใช้ &quot;{query}&quot; (กำหนดเอง)
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SECTION: Model Routing ───────────────────────────────────────────────────
 function ModelRoutingSection({ s, set }: { s: AdminSettings["model_routing"]; set: (v: AdminSettings["model_routing"]) => void }) {
   const f = (k: keyof typeof s) => (v: string) => set({ ...s, [k]: v });
-  const rows = [
-    { key: "triage_model" as const,     label: "Triage / Feed Scoring",    note: "ประมวลผล feed ทุกชิ้น — ใช้ model เล็กเร็ว" },
-    { key: "brief_model" as const,      label: "Brief Builder",             note: "สร้างรายงาน — ใช้ model ใหญ่กว่า" },
-    { key: "vision_model" as const,     label: "Vision / UGC Verify",       note: "วิเคราะห์รูปภาพและวิดีโอ" },
-    { key: "simulation_model" as const, label: "Scenario Simulation",       note: "MiroFish fallback LLM" },
+  const rows: { key: keyof AdminSettings["model_routing"]; label: string; note: string }[] = [
+    { key: "triage_model",      label: "Triage / Feed Scoring",     note: "ประมวลผล feed ทุกชิ้น — ใช้ model เล็กเร็ว" },
+    { key: "brief_model",       label: "Brief Builder",              note: "สร้างรายงาน — ใช้ model ใหญ่กว่า" },
+    { key: "vision_model",      label: "Vision / UGC Verify",        note: "วิเคราะห์รูปภาพและวิดีโอ" },
+    { key: "simulation_model",  label: "Scenario Simulation",        note: "MiroFish fallback LLM" },
+    { key: "requirements_model", label: "PIR / EEI (Perplexica)",   note: "สร้าง EEI และ deep research — model ต้องรองรับ JSON output" },
+    { key: "deception_model",   label: "Counter-Intel / Deception",  note: "วิเคราะห์ cui bono, bot network, timing" },
+    { key: "darkweb_model",     label: "Dark Web Classification",    note: "จัดประเภทผลลัพธ์จาก .onion — PASS / FLAGGED / BLOCKED" },
   ];
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       {rows.map(r => (
-        <div key={r.key} className="grid grid-cols-[1fr_220px] items-center gap-6 py-3 border-b border-[var(--border)] last:border-0">
+        <div key={r.key} className="grid grid-cols-[1fr_260px] items-center gap-6 py-3 border-b border-[var(--border)] last:border-0">
           <div>
             <p className="text-sm text-[var(--text)]">{r.label}</p>
             <p className="text-[10px] text-[var(--text-3)] mt-0.5">{r.note}</p>
           </div>
-          <input value={s[r.key]} onChange={e => f(r.key)(e.target.value)} className={inputCls} placeholder="qwen3:8b" />
+          <ModelSelect value={s[r.key]} onChange={f(r.key)} />
         </div>
       ))}
     </div>
@@ -231,9 +337,10 @@ function TriageSection({ s, set }: { s: AdminSettings["triage"]; set: (v: AdminS
 }
 
 // ─── SECTION: SearXNG + Perplexica ──────────────────────────────────────────
-function SearxngSection({ s, p, setS, setP }: {
-  s: AdminSettings["searxng"]; p: AdminSettings["perplexica"];
+function SearxngSection({ s, p, mr, setS, setP, setMr }: {
+  s: AdminSettings["searxng"]; p: AdminSettings["perplexica"]; mr: AdminSettings["model_routing"];
   setS: (v: AdminSettings["searxng"]) => void; setP: (v: AdminSettings["perplexica"]) => void;
+  setMr: (v: AdminSettings["model_routing"]) => void;
 }) {
   const engines = [
     { key: "google" as const, label: "Google" },
@@ -291,18 +398,24 @@ function SearxngSection({ s, p, setS, setP }: {
       <div className={divider} />
       <div>
         <p className={sectionTitle}>Perplexica</p>
-        <Field label="URL" note="AI research assistant — ใช้ใน Investigation Research Panel">
-          <input value={p.url} onChange={e => setP({ url: e.target.value })} className={inputCls} />
-        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="URL" note="AI research assistant — ใช้ใน Investigation Research Panel">
+            <input value={p.url} onChange={e => setP({ url: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label="Chat Model" note="ใช้สำหรับ PIR / EEI deep research — ต้องรองรับ JSON">
+            <ModelSelect value={mr.requirements_model} onChange={v => setMr({ ...mr, requirements_model: v })} />
+          </Field>
+        </div>
       </div>
     </div>
   );
 }
 
 // ─── SECTION: SpiderFoot + MiroFish ─────────────────────────────────────────
-function ToolsSection({ sf, mf, setSf, setMf }: {
-  sf: AdminSettings["spiderfoot"]; mf: AdminSettings["mirofish"];
+function ToolsSection({ sf, mf, mr, setSf, setMf, setMr }: {
+  sf: AdminSettings["spiderfoot"]; mf: AdminSettings["mirofish"]; mr: AdminSettings["model_routing"];
   setSf: (v: AdminSettings["spiderfoot"]) => void; setMf: (v: AdminSettings["mirofish"]) => void;
+  setMr: (v: AdminSettings["model_routing"]) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -334,6 +447,9 @@ function ToolsSection({ sf, mf, setSf, setMf }: {
             <select value={mf.default_agents} onChange={e => setMf({ ...mf, default_agents: +e.target.value })} className={inputCls}>
               {[500, 1000, 3000].map(n => <option key={n} value={n}>{n.toLocaleString()}</option>)}
             </select>
+          </Field>
+          <Field label="LLM Fallback Model" note="โมเดลที่ใช้จำลองสถานการณ์เมื่อไม่มี MiroFish API">
+            <ModelSelect value={mr.simulation_model} onChange={v => setMr({ ...mr, simulation_model: v })} />
           </Field>
         </div>
       </div>
@@ -1142,16 +1258,16 @@ function AdminSettingsInner() {
                 <SaveBar onSave={() => handleSave("triage")} saving={save.isPending} saved={saved} />
               </>
             )}
-            {activeTab === "searxng" && s.searxng && s.perplexica && (
+            {activeTab === "searxng" && s.searxng && s.perplexica && s.model_routing && (
               <>
-                <SearxngSection s={s.searxng} p={s.perplexica} setS={setSection("searxng")} setP={setSection("perplexica")} />
-                <SaveBar onSave={async () => { await save.mutateAsync({ searxng: draft.searxng, perplexica: draft.perplexica }); setSavedTab("searxng"); setTimeout(() => setSavedTab(null), 2000); }} saving={save.isPending} saved={saved} />
+                <SearxngSection s={s.searxng} p={s.perplexica} mr={s.model_routing} setS={setSection("searxng")} setP={setSection("perplexica")} setMr={setSection("model_routing")} />
+                <SaveBar onSave={async () => { await save.mutateAsync({ searxng: draft.searxng, perplexica: draft.perplexica, model_routing: draft.model_routing }); setSavedTab("searxng"); setTimeout(() => setSavedTab(null), 2000); }} saving={save.isPending} saved={saved} />
               </>
             )}
-            {activeTab === "tools" && s.spiderfoot && s.mirofish && (
+            {activeTab === "tools" && s.spiderfoot && s.mirofish && s.model_routing && (
               <>
-                <ToolsSection sf={s.spiderfoot} mf={s.mirofish} setSf={setSection("spiderfoot")} setMf={setSection("mirofish")} />
-                <SaveBar onSave={async () => { await save.mutateAsync({ spiderfoot: draft.spiderfoot, mirofish: draft.mirofish }); setSavedTab("spiderfoot"); setTimeout(() => setSavedTab(null), 2000); }} saving={save.isPending} saved={saved} />
+                <ToolsSection sf={s.spiderfoot} mf={s.mirofish} mr={s.model_routing} setSf={setSection("spiderfoot")} setMf={setSection("mirofish")} setMr={setSection("model_routing")} />
+                <SaveBar onSave={async () => { await save.mutateAsync({ spiderfoot: draft.spiderfoot, mirofish: draft.mirofish, model_routing: draft.model_routing }); setSavedTab("spiderfoot"); setTimeout(() => setSavedTab(null), 2000); }} saving={save.isPending} saved={saved} />
               </>
             )}
             {activeTab === "databases" && s.databases && (

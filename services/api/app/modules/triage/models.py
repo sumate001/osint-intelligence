@@ -17,7 +17,7 @@ class FeedItem(Base):
     )
 
     # Canonical identity
-    external_id: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
+    external_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     source_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -25,7 +25,7 @@ class FeedItem(Base):
     # Content
     title: Mapped[str] = mapped_column(String(1000), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
     language: Mapped[str] = mapped_column(String(10), default="th")
 
     # Timing

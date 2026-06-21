@@ -20,7 +20,7 @@ def _make_celery_session():
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-@celery_app.task(name="investigation.run_spiderfoot_scan", bind=True, max_retries=3)
+@celery_app.task(name="investigation.run_spiderfoot_scan", bind=True, max_retries=3, queue="intel")
 def run_spiderfoot_scan(self, scan_id: str) -> None:
     asyncio.run(_run_scan(scan_id))
 
@@ -114,6 +114,22 @@ async def _run_scan(scan_id: str) -> None:
                     scan2.results = {"entities": entities}
                     scan2.completed_at = datetime.now(timezone.utc)
                     await db2.commit()
+
+            # Dispatch PIR match for SpiderFoot findings
+            if entities:
+                from ...modules.requirements.tasks import match_pir_task
+                entity_lines = [
+                    f"{e[10] if len(e) > 10 else 'Entity'}: {e[2]}"
+                    for e in entities[:50]
+                    if isinstance(e, list) and len(e) > 2 and e[2]
+                ]
+                if entity_lines:
+                    body = "\n".join(entity_lines)
+                    match_pir_task.delay(
+                        f"SpiderFoot scan: {scan.target}",
+                        body,
+                        source="spiderfoot",
+                    )
 
             # Push entities to Neo4j
             # SpiderFoot result array: [timestamp, data, value, module, confidence, risk, ...]

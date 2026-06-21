@@ -46,6 +46,9 @@ export interface ModelRoutingSettings {
   brief_model: string;
   vision_model: string;
   simulation_model: string;
+  requirements_model: string;
+  deception_model: string;
+  darkweb_model: string;
 }
 export interface TriageWeightSettings {
   freshness: number;
@@ -121,6 +124,8 @@ export type SettingsPatch = Partial<AdminSettings>;
 export const getAdminSettings = () => apiFetch<AdminSettings>("/api/v1/admin/settings");
 export const patchAdminSettings = (patch: SettingsPatch) =>
   apiFetch<AdminSettings>("/api/v1/admin/settings", { method: "PATCH", body: patch });
+export const getOllamaModels = () =>
+  apiFetch<{ models: string[] }>("/api/v1/admin/ollama/models").then((r) => r.models);
 
 // ─── Users ─────────────────────────────────────────────────────────────────
 export interface AdminUser {

@@ -167,7 +167,9 @@ Config: agents={config.get('agents', 1000)}, timeframe={config.get('timeframe', 
     ]
 
     try:
-        result = await chat_json(messages, module="simulation")
+        from ..admin.service import get_effective_model
+        effective_model = await get_effective_model("simulation")
+        result = await chat_json(messages, module="simulation", model=effective_model)
     except Exception as exc:
         log.error("Simulation LLM call failed for job %s: %s", job_id, exc)
         result = {"confidence": "LOW", "scenarios": [], "signals": [], "timeline": [], "pivot_points": [], "coverage_strategy": "ไม่สามารถวิเคราะห์ได้ — LLM error: " + str(exc)[:200]}

@@ -64,6 +64,15 @@ async def _run(query_id: str) -> None:
                 dq.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
+        # Dispatch PIR match for each non-blocked dark web result
+        from ...modules.requirements.tasks import match_pir_task
+        for item in classified:
+            if item.get("classification") != "BLOCKED":
+                title = item.get("title", "")
+                body = item.get("summary", "")
+                if title or body:
+                    match_pir_task.delay(title, body, source="darkweb")
+
     except Exception as exc:
         log.error("Dark web query failed: %s", exc)
         async with SessionLocal() as db:
@@ -146,7 +155,9 @@ Query: {query}
 classification: FLAGGED=พบข้อมูลเกี่ยวข้องต้อง legal review, PASS=ข้อมูลทั่วไป, BLOCKED=เนื้อหาไม่เหมาะสม"""},
         ]
         try:
-            parsed = await chat_json(messages, module="default")
+            from ..admin.service import get_effective_model
+            effective_model = await get_effective_model("darkweb")
+            parsed = await chat_json(messages, module="darkweb", model=effective_model)
             classified.append({
                 "url": item.get("url", ""),
                 "title": item.get("title", ""),

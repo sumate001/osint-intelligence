@@ -13,6 +13,7 @@ celery_app = Celery(
         "app.modules.verify.tasks",
         "app.modules.simulation.tasks",
         "app.modules.darkweb.tasks",
+        "app.modules.requirements.tasks",
     ],
 )
 
@@ -29,7 +30,8 @@ celery_app.conf.update(
     beat_schedule={
         "poll-all-sources": {
             "task": "triage.poll_all_sources",
-            "schedule": 60.0,  # every minute, task itself checks per-source intervals
+            "schedule": 60.0,
+            "options": {"queue": "triage"},
         },
     },
 )
