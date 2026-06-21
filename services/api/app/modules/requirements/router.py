@@ -12,6 +12,10 @@ router = APIRouter()
 async def create_pir(body: PIRCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     async with db.begin():
         pir = await service.create_pir(db, body, current_user["id"])
+    # Auto-generate EEIs if none provided
+    if not pir.eei_list:
+        from .tasks import generate_eei_task
+        generate_eei_task.delay(pir.id)
     return PIROut.model_validate(pir)
 
 

@@ -132,11 +132,11 @@ Required env vars — see `.env.example` for full list:
 
 ```
 OLLAMA_BASE_URL         # http://host:11434
-OLLAMA_DEFAULT_MODEL    # qwen3:8b
+OLLAMA_DEFAULT_MODEL    # gemma4:12b
 POSTGRES_URL            # postgresql+asyncpg://...
 NEO4J_URI               # bolt://localhost:7687
 REDIS_URL               # redis://localhost:6379/0
-MINIO_ENDPOINT          # localhost:9000
+MINIO_ENDPOINT          # localhost:9000  (NO http:// prefix — code prepends it)
 SEARXNG_URL             # http://localhost:8080
 PERPLEXICA_URL          # http://localhost:3002  (Vane image — root / returns 200, /api/health returns 404)
 SPIDERFOOT_URL          # http://localhost:5001
@@ -144,14 +144,26 @@ SPIDERFOOT_URL          # http://localhost:5001
 SECRET_KEY              # JWT signing key
 ```
 
-Module-specific routing (override per module):
+Module-specific routing (override per module). All modules except triage default to `gemma4:12b`.
+UI settings (Admin → Settings → AI) override these env vars at runtime — no container restart needed:
 
 ```
-TRIAGE_MODEL            # default: qwen3:8b
-BRIEF_MODEL             # default: qwen3:14b
-VISION_MODEL            # default: gemma4:27b
-SIMULATION_MODEL        # default: qwen3:14b
+TRIAGE_MODEL            # default: gemma4:e4b  (triage queue — lightweight)
+BRIEF_MODEL             # default: gemma4:12b
+VISION_MODEL            # default: gemma4:12b
+SIMULATION_MODEL        # default: gemma4:12b
+REQUIREMENTS_MODEL      # default: gemma4:12b  (PIR / EEI matching)
+DECEPTION_MODEL         # default: gemma4:12b  (cui bono, bot detection)
+DARKWEB_MODEL           # default: gemma4:12b  (classify .onion content)
 ```
+
+**Model routing pattern** — every module that calls LLM must use this:
+```python
+from ..admin.service import get_effective_model
+effective_model = await get_effective_model("module_name")
+result = await chat_json(messages, module="module_name", model=effective_model)
+```
+`get_effective_model()` reads `SystemSettings` DB first, falls back to env var. Direct `settings.xxx_model` bypasses the UI override — don't do this.
 
 ## Integration Notes
 
@@ -160,6 +172,7 @@ SIMULATION_MODEL        # default: qwen3:14b
 - Status: `GET /scanstatus?id={scanId}` → array where index 5 is status string (`FINISHED` / `ABORTED` / `ERROR-FAILED`)
 - Results: `GET /scaneventresults?id={scanId}` → array of result arrays
 - Abort: `GET /stopscan?id={scanId}`
+- **Target types**: SpiderFoot accepts domain, IP, or email ONLY — not full URLs (`https://...`) and not plain entity names ("Australia"). Extract `netloc` from URL with `urlparse`, strip `www.`, validate with domain regex before passing as target.
 
 **Perplexica / Vane image**: health check is `GET /` (200 OK) — `/api/health` returns 404
 
@@ -167,7 +180,16 @@ SIMULATION_MODEL        # default: qwen3:14b
 
 **MiroFish**: `MIROFISH_URL` unset → LLM fallback used (correct behavior). Setting it requires Zep graph workflow configured — see `modules/simulation/tasks.py`
 
-**get_settings() lru_cache**: after `.env` changes, use `docker compose up -d --force-recreate api worker` (plain restart doesn't reload env vars)
+**get_settings() lru_cache**: after `.env` changes, use `docker compose up -d --force-recreate api worker worker-intel` (plain restart doesn't reload env vars)
+
+**Meilisearch primary key**: `feed_items` index has both `id` and `source_id` — always set `primaryKey="id"` explicitly on `create_index()` and in every `add_documents()` call, otherwise Meilisearch raises `index_primary_key_multiple_candidates_found` and silently drops documents.
+
+**Cross-source URL dedup**: `_ingest_source()` deduplicates by both `external_id` (within same source) AND `url` (across all sources). This prevents the same article from 15 different RSS feeds being stored 15 times.
+
+**Celery queue separation** — two workers, never mix:
+- `osint-worker` → `triage` queue — 8 concurrency, uses `gemma4:e4b`, handles feed ingestion + scoring
+- `osint-worker-intel` → `intel` queue — 4 concurrency, uses `gemma4:12b`, handles SpiderFoot scans + PIR matching
+- `investigation.run_spiderfoot_scan` task **must** declare `queue="intel"` — without it, task goes to default `celery` queue where no worker listens
 
 ## Do Not Touch
 

@@ -71,6 +71,14 @@ async def delete_user(
     await service.delete_user(db, user_id, current_user["id"])
 
 
+@router.get("/ollama/models")
+async def list_ollama_models(db: AsyncSession = Depends(get_db), _: dict = _admin):
+    """Return list of model names available in Ollama."""
+    settings = await service.get_settings_merged(db)
+    models = await service.list_ollama_models(settings.ai.ollama_base_url)
+    return {"models": models}
+
+
 @router.get("/health", response_model=list[ServiceHealth])
 async def service_health(db: AsyncSession = Depends(get_db), _: dict = _admin):
     settings = await service.get_settings_merged(db)

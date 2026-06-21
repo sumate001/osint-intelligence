@@ -40,13 +40,13 @@ case "${1:-}" in
     exit 0 ;;
 
   --restart)
-    info "Restart api + worker + beat..."
-    docker compose -f "$COMPOSE_FILE" restart api worker beat
+    info "Restart api + worker + worker-intel + beat..."
+    docker compose -f "$COMPOSE_FILE" restart api worker worker-intel beat
     ok "restart แล้ว"
     exit 0 ;;
 
   --logs)
-    docker compose -f "$COMPOSE_FILE" logs -f api worker beat
+    docker compose -f "$COMPOSE_FILE" logs -f api worker worker-intel beat
     exit 0 ;;
 
   --status)
@@ -90,18 +90,21 @@ case "${1:-}" in
     # Ensure new env vars exist
     set -a; source "$ENV_FILE" 2>/dev/null || true; set +a
     _ensure_var() { grep -q "^${1}=" "$ENV_FILE" || echo "${1}=${2}" >> "$ENV_FILE"; }
-    _ensure_var "WHISPER_MODEL"  "whisper"
-    _ensure_var "PERPLEXICA_URL" "http://perplexica:3000"
-    _ensure_var "SPIDERFOOT_URL" "http://spiderfoot:5001"
+    _ensure_var "WHISPER_MODEL"      "whisper"
+    _ensure_var "PERPLEXICA_URL"     "http://perplexica:3000"
+    _ensure_var "SPIDERFOOT_URL"     "http://spiderfoot:5001"
+    _ensure_var "REQUIREMENTS_MODEL" "gemma4:12b"
+    _ensure_var "DECEPTION_MODEL"    "gemma4:12b"
+    _ensure_var "DARKWEB_MODEL"      "gemma4:12b"
     sed -i 's|^MINIO_ENDPOINT=http://|MINIO_ENDPOINT=|' "$ENV_FILE"
-    # Rebuild and restart (rolling: worker/beat first, then api, then frontend)
+    # Rebuild and restart (rolling: workers first, then api, then frontend)
     info "Rebuild images..."
     DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build --parallel api worker frontend 2>&1 \
       | grep -E "^(#[0-9]+ |Step|Successfully built|ERROR|error)" || true
     ok "Build เสร็จ"
     echo ""
     info "Restart services..."
-    docker compose -f "$COMPOSE_FILE" up -d --no-deps worker beat
+    docker compose -f "$COMPOSE_FILE" up -d --no-deps worker worker-intel beat
     docker compose -f "$COMPOSE_FILE" up -d --no-deps api
     docker compose -f "$COMPOSE_FILE" up -d --no-deps frontend nginx
     echo ""
@@ -191,11 +194,14 @@ _ensure_var() {
   local key="$1" val="$2"
   grep -q "^${key}=" "$ENV_FILE" || echo "${key}=${val}" >> "$ENV_FILE"
 }
-_ensure_var "SPIDERFOOT_URL"  "http://spiderfoot:5001"
-_ensure_var "PERPLEXICA_URL"  "http://perplexica:3000"
-_ensure_var "WHISPER_MODEL"   "whisper"
-_ensure_var "ZEP_API_KEY"     ""
-_ensure_var "MINIO_ENDPOINT"  "minio:9000"
+_ensure_var "SPIDERFOOT_URL"      "http://spiderfoot:5001"
+_ensure_var "PERPLEXICA_URL"      "http://perplexica:3000"
+_ensure_var "WHISPER_MODEL"       "whisper"
+_ensure_var "ZEP_API_KEY"         ""
+_ensure_var "MINIO_ENDPOINT"      "minio:9000"
+_ensure_var "REQUIREMENTS_MODEL"  "gemma4:12b"
+_ensure_var "DECEPTION_MODEL"     "gemma4:12b"
+_ensure_var "DARKWEB_MODEL"       "gemma4:12b"
 
 # แก้ MINIO_ENDPOINT ถ้ายังมี http:// นำหน้า
 sed -i 's|^MINIO_ENDPOINT=http://|MINIO_ENDPOINT=|' "$ENV_FILE"
@@ -404,7 +410,7 @@ echo -e "  Password: ${CYAN}${ADMIN_PASS}${NC}"
 echo ""
 echo -e "  ${BOLD}Commands:${NC}"
 echo -e "  ./deploy.sh --update    git pull + rebuild + migrate"
-echo -e "  ./deploy.sh --restart   restart api + worker"
+echo -e "  ./deploy.sh --restart   restart api + worker + worker-intel"
 echo -e "  ./deploy.sh --ssl       ตั้งค่า SSL (Let's Encrypt)"
 echo -e "  ./deploy.sh --logs      live logs"
 echo -e "  ./deploy.sh --status    สถานะ containers"

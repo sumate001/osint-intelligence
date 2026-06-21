@@ -87,7 +87,10 @@ async def add_evidence(
     case = await service.get_case(db, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-    return await service.add_evidence(db, case_id, data)
+    ev = await service.add_evidence(db, case_id, data)
+    from ...modules.requirements.tasks import match_pir_task
+    match_pir_task.delay(ev.title, ev.content or "", source="evidence")
+    return ev
 
 
 @router.get("/cases/{case_id}/evidence", response_model=list[EvidenceOut])

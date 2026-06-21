@@ -1,9 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "../api/intelligence";
 
-// PIR
+// PIR — poll every 8s so auto-match updates appear without manual refresh
 export const usePIRs = (status?: string) =>
-  useQuery({ queryKey: ["pirs", status], queryFn: () => api.getPIRs(status) });
+  useQuery({
+    queryKey: ["pirs", status],
+    queryFn: () => api.getPIRs(status),
+    refetchInterval: 8000,
+  });
 
 export const useCreatePIR = () => {
   const qc = useQueryClient();

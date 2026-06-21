@@ -190,7 +190,23 @@ services:
     depends_on:
       - redis
       - api
-    command: celery -A app.worker worker --loglevel=info
+    command: celery -A app.worker worker --loglevel=info --queues=triage --concurrency=8 --hostname=worker-triage@%h
+    restart: unless-stopped
+
+  worker-intel:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: osint-worker-intel
+    env_file: .env
+    volumes:
+      - ./services/api:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+      - api
+    command: celery -A app.worker worker --loglevel=info --queues=intel --concurrency=4 --hostname=worker-intel@%h
     restart: unless-stopped
 
   beat:
