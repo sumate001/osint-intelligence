@@ -15,7 +15,7 @@ import type { EvidenceCreate } from "@/lib/types/investigation";
 
 // ── Auth-aware image loader ───────────────────────────────────────────────────
 
-function AuthImage({ jobId, className }: { jobId: string; className?: string }) {
+function AuthImage({ src, className, fallback }: { src: string; className?: string; fallback?: React.ReactNode }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -24,19 +24,17 @@ function AuthImage({ jobId, className }: { jobId: string; className?: string }) 
     const stored = typeof window !== "undefined" ? localStorage.getItem("osintdesk-auth") : null;
     const token = stored ? JSON.parse(stored)?.state?.token : null;
 
-    fetch(`/api/v1/verify/jobs/${jobId}/media`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetch(src, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((r) => { if (!r.ok) throw new Error("fail"); return r.blob(); })
       .then((blob) => { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); })
       .catch(() => setError(true));
 
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [jobId]);
+  }, [src]);
 
-  if (error) return <div className="w-full h-full rounded-lg bg-[var(--surface-3)] flex items-center justify-center text-[var(--text-3)] text-[10px]">ไม่มีรูป</div>;
-  if (!url) return <div className="w-full h-full rounded-lg bg-[var(--surface-3)] animate-pulse" />;
-  return <img src={url} alt="" className={cn("w-full h-full object-cover rounded-lg", className)} />;
+  if (error) return <>{fallback ?? null}</>;
+  if (!url) return <div className={cn("bg-[var(--surface-3)] animate-pulse rounded-lg", className)} />;
+  return <img src={url} alt="" className={cn("object-cover rounded-lg", className)} />;
 }
 
 // ── Thumbnail by file type ────────────────────────────────────────────────────
@@ -47,7 +45,7 @@ function FileTypeThumb({ job }: { job: VerifyJob }) {
   const isProcessing = job.status === "PENDING" || job.status === "PROCESSING";
 
   if (job.file_type === "image") {
-    return <AuthImage jobId={job.id} />;
+    return <AuthImage src={`/api/v1/verify/jobs/${job.id}/media`} className="w-full h-full" />;
   }
 
   if (isProcessing) {
@@ -110,7 +108,7 @@ function CasePicker({ job, onClose }: { job: VerifyJob; onClose: () => void }) {
   const [done, setDone] = useState(false);
 
   const verdict = job.verdict ?? "UNVERIFIED";
-  type KfShot = { ts: number; description: string; transcript_context: string };
+  type KfShot = { ts: number; description: string; transcript_context: string; minio_key?: string };
   const exif = job.exif_data as Record<string, unknown>;
   const shots: KfShot[] = Array.isArray(exif?.KeyframeAnalysis)
     ? (exif.KeyframeAnalysis as KfShot[])
@@ -209,7 +207,7 @@ export function VerifyResultCard({ job }: { job: VerifyJob }) {
   const ruleNotes = noteParts.length > 1 ? noteParts[noteParts.length - 1].trim() : rawNotes.trim();
   const llmSummary = noteParts.length > 1 ? noteParts.slice(0, -1).join("\n\n---\n").trim() : null;
 
-  type KfShot = { ts: number; description: string; transcript_context: string };
+  type KfShot = { ts: number; description: string; transcript_context: string; minio_key?: string };
   const exif = job.exif_data as Record<string, unknown>;
   const keyframeShots: KfShot[] = Array.isArray(exif?.KeyframeAnalysis)
     ? (exif.KeyframeAnalysis as KfShot[])
@@ -467,18 +465,39 @@ export function VerifyResultCard({ job }: { job: VerifyJob }) {
                 {keyframesOpen && (
                   <div className="divide-y divide-[var(--border)]">
                     {keyframeShots.map((shot, i) => (
-                      <div key={i} className="px-3 py-3 bg-[var(--surface-2)] space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--accent)]">
-                            {Math.floor(shot.ts / 60)}:{String(Math.round(shot.ts % 60)).padStart(2, "0")}
-                          </span>
-                          {shot.transcript_context && (
-                            <span className="text-[10px] text-[var(--yellow)] italic truncate flex-1">
-                              &ldquo;{shot.transcript_context}&rdquo;
-                            </span>
+                      <div key={i} className="flex gap-3 px-3 py-3 bg-[var(--surface-2)]">
+                        {/* Frame thumbnail */}
+                        <div className="shrink-0 w-[120px] h-[80px]">
+                          {shot.minio_key ? (
+                            <AuthImage
+                              src={`/api/v1/verify/jobs/${job.id}/frames/${i}`}
+                              className="w-[120px] h-[80px]"
+                              fallback={
+                                <div className="w-[120px] h-[80px] rounded-lg bg-[var(--surface-3)] flex items-center justify-center">
+                                  <Film size={16} className="text-[var(--text-3)]" />
+                                </div>
+                              }
+                            />
+                          ) : (
+                            <div className="w-[120px] h-[80px] rounded-lg bg-[var(--surface-3)] flex items-center justify-center">
+                              <Film size={16} className="text-[var(--text-3)]" />
+                            </div>
                           )}
                         </div>
-                        <p className="text-xs text-[var(--text)] leading-relaxed">{shot.description}</p>
+                        {/* Description */}
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--accent)] shrink-0">
+                              {Math.floor(shot.ts / 60)}:{String(Math.round(shot.ts % 60)).padStart(2, "0")}
+                            </span>
+                            {shot.transcript_context && (
+                              <span className="text-[10px] text-[var(--yellow)] italic truncate">
+                                &ldquo;{shot.transcript_context}&rdquo;
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[var(--text)] leading-relaxed">{shot.description}</p>
+                        </div>
                       </div>
                     ))}
                   </div>

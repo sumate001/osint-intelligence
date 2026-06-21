@@ -125,6 +125,53 @@ async def get_job_media(
     )
 
 
+@router.get("/jobs/{job_id}/frames/{idx}")
+async def get_job_frame(
+    job_id: uuid.UUID,
+    idx: int,
+    db=Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Serve a saved keyframe JPEG from MinIO."""
+    import asyncio
+    import io
+    from fastapi.responses import StreamingResponse
+
+    job = (await db.execute(select(VerifyJob).where(VerifyJob.id == job_id))).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404)
+
+    frames = (job.exif_data or {}).get("KeyframeAnalysis", [])
+    if idx < 0 or idx >= len(frames) or not frames[idx].get("minio_key"):
+        raise HTTPException(status_code=404, detail="Frame not stored")
+
+    minio_key: str = frames[idx]["minio_key"]
+    settings = get_settings()
+
+    def _dl():
+        from minio import Minio
+        bucket, *kparts = minio_key.split("/", 1)
+        obj_key = kparts[0] if kparts else minio_key
+        c = Minio(
+            settings.minio_endpoint,
+            access_key=getattr(settings, "minio_user", ""),
+            secret_key=getattr(settings, "minio_password", ""),
+            secure=False,
+        )
+        return c.get_object(bucket, obj_key).read()
+
+    try:
+        data = await asyncio.to_thread(_dl)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Frame not found in storage")
+
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.delete("/jobs/{job_id}", status_code=204)
 async def delete_job(
     job_id: uuid.UUID,

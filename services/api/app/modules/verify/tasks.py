@@ -143,6 +143,8 @@ async def _run_pipeline(job_id: str) -> None:
                 except Exception as exc:
                     log.warning("Shot selection failed, falling back to even sampling: %s", exc)
 
+            from .service import upload_to_minio as _upload_frame
+
             if not target_timestamps:
                 # No transcript or LLM failed — evenly-spaced fallback
                 log.info("Using evenly-spaced frame sampling for job %s", job_id)
@@ -157,7 +159,15 @@ async def _run_pipeline(job_id: str) -> None:
                         "ป้ายหรือข้อความ และสิ่งผิดปกติที่อาจบ่งชี้การตัดต่อ",
                     )
                     if desc:
-                        keyframe_analysis.append({"ts": ts, "description": desc, "transcript_context": ""})
+                        idx = len(keyframe_analysis)
+                        minio_key = f"verify/{job_id}/frame_{idx}.jpg"
+                        await _upload_frame(frame_bytes, minio_key, "image/jpeg")
+                        keyframe_analysis.append({
+                            "ts": ts,
+                            "description": desc,
+                            "transcript_context": "",
+                            "minio_key": minio_key,
+                        })
             else:
                 # Extract and describe frames at LLM-selected timestamps
                 for ts in target_timestamps:
@@ -180,12 +190,16 @@ async def _run_pipeline(job_id: str) -> None:
                         "และสิ่งผิดปกติที่อาจบ่งชี้การตัดต่อหรือ deepfake",
                     )
                     if desc:
+                        idx = len(keyframe_analysis)
+                        minio_key = f"verify/{job_id}/frame_{idx}.jpg"
+                        await _upload_frame(frame_bytes, minio_key, "image/jpeg")
                         keyframe_analysis.append({
                             "ts": round(ts, 1),
                             "description": desc,
                             "transcript_context": ctx,
+                            "minio_key": minio_key,
                         })
-                        log.info("Shot at %.1fs described for job %s", ts, job_id)
+                        log.info("Shot at %.1fs saved to MinIO for job %s", ts, job_id)
 
         # ── 5. Wayback Machine check ───────────────────────────────────────────
         source_url = exif_data.get("SourceURL") or exif_data.get("Comment", "")
