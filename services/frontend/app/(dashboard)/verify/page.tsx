@@ -68,108 +68,84 @@ export default function VerifyPage() {
             ))}
           </div>
 
-          {/* ── Two-column main area ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
+          {/* ── Upload ── */}
+          <section className="space-y-3">
+            {isUploading && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border-2)] text-xs text-[var(--text-2)]">
+                <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0" />
+                กำลังอัปโหลดและสร้างงาน...
+              </div>
+            )}
+            <DropZone onUpload={handleUpload} isUploading={isUploading} />
+            {uploadError && <p className="text-sm text-[var(--red)]">{uploadError}</p>}
+          </section>
 
-            {/* Left: upload panel — sticky on large screens */}
-            <div className="lg:sticky lg:top-0 space-y-3">
+          {/* ── Manual jobs ── */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
               <p className="text-[11px] text-[var(--text-3)] uppercase tracking-widest font-semibold">
-                อัปโหลดไฟล์
-              </p>
-
-              {isUploading && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border-2)] text-xs text-[var(--text-2)]">
-                  <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0" />
-                  กำลังอัปโหลดและสร้างงาน...
-                </div>
-              )}
-
-              <DropZone onUpload={handleUpload} isUploading={isUploading} />
-
-              {uploadError && (
-                <p className="text-sm text-[var(--red)]">{uploadError}</p>
-              )}
-
-              <p className="text-[10px] text-[var(--text-3)] leading-relaxed">
-                รองรับ JPG · PNG · GIF · WebP · MP4 · MOV · MP3 · WAV · สูงสุด 500 MB
-                <br />
-                ระบบจะตรวจ EXIF · GPS · Wayback · transcript · keyframe อัตโนมัติ
-              </p>
-            </div>
-
-            {/* Right: job lists */}
-            <div className="space-y-5 min-w-0">
-
-              {/* Manual jobs */}
-              <section className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] text-[var(--text-3)] uppercase tracking-widest font-semibold">
-                    อัปโหลดเอง
-                    {manualJobs.length > 0 && (
-                      <span className="ml-2 font-normal normal-case tracking-normal text-[var(--text-2)]">
-                        {manualJobs.length} รายการ
-                      </span>
-                    )}
-                  </p>
-                  <button
-                    onClick={() => refetch()}
-                    className="p-1 rounded hover:bg-[var(--surface-2)] text-[var(--text-2)]"
-                    title={t("common.refresh")}
-                  >
-                    <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-                  </button>
-                </div>
-
-                {isLoading ? (
-                  <div className="flex items-center justify-center gap-2 py-10 text-[var(--text-3)] text-sm">
-                    <Loader2 size={16} className="animate-spin" />
-                    {t("common.loading")}
-                  </div>
-                ) : manualJobs.length === 0 ? (
-                  <div className="text-center py-12 text-[var(--text-3)]">
-                    <ShieldCheck size={32} className="mx-auto mb-2 opacity-20" />
-                    <p className="text-sm">{t("verify.no_jobs")}</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                    {manualJobs.map((job) => (
-                      <VerifyResultCard key={job.id} job={job} />
-                    ))}
-                  </div>
+                อัปโหลดเอง
+                {manualJobs.length > 0 && (
+                  <span className="ml-2 font-normal normal-case tracking-normal text-[var(--text-2)]">
+                    {manualJobs.length} รายการ
+                  </span>
                 )}
-              </section>
-
-              {/* Auto-verify from feed */}
-              {feedJobs.length > 0 && (
-                <section className="space-y-2">
-                  <button
-                    onClick={() => setFeedSectionOpen((v) => !v)}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Rss size={13} className="text-[var(--accent)]" />
-                      <span className="text-[11px] text-[var(--text-3)] uppercase tracking-widest font-semibold">
-                        ตรวจสอบอัตโนมัติจาก Feed
-                      </span>
-                      <span className="text-xs text-[var(--text-2)]">{feedJobs.length} รายการ</span>
-                    </div>
-                    {feedSectionOpen
-                      ? <ChevronUp size={14} className="text-[var(--text-3)]" />
-                      : <ChevronDown size={14} className="text-[var(--text-3)]" />}
-                  </button>
-
-                  {feedSectionOpen && (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-2 pt-1">
-                      {feedJobs.map((job) => (
-                        <VerifyResultCard key={job.id} job={job} />
-                      ))}
-                    </div>
-                  )}
-                </section>
-              )}
-
+              </p>
+              <button
+                onClick={() => refetch()}
+                className="p-1 rounded hover:bg-[var(--surface-2)] text-[var(--text-2)]"
+                title={t("common.refresh")}
+              >
+                <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+              </button>
             </div>
-          </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-[var(--text-3)] text-sm">
+                <Loader2 size={16} className="animate-spin" />
+                {t("common.loading")}
+              </div>
+            ) : manualJobs.length === 0 ? (
+              <div className="text-center py-12 text-[var(--text-3)]">
+                <ShieldCheck size={32} className="mx-auto mb-2 opacity-20" />
+                <p className="text-sm">{t("verify.no_jobs")}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {manualJobs.map((job) => (
+                  <VerifyResultCard key={job.id} job={job} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ── Auto-verify from feed ── */}
+          {feedJobs.length > 0 && (
+            <section className="space-y-2">
+              <button
+                onClick={() => setFeedSectionOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Rss size={13} className="text-[var(--accent)]" />
+                  <span className="text-[11px] text-[var(--text-3)] uppercase tracking-widest font-semibold">
+                    ตรวจสอบอัตโนมัติจาก Feed
+                  </span>
+                  <span className="text-xs text-[var(--text-2)]">{feedJobs.length} รายการ</span>
+                </div>
+                {feedSectionOpen
+                  ? <ChevronUp size={14} className="text-[var(--text-3)]" />
+                  : <ChevronDown size={14} className="text-[var(--text-3)]" />}
+              </button>
+              {feedSectionOpen && (
+                <div className="space-y-2 pt-1">
+                  {feedJobs.map((job) => (
+                    <VerifyResultCard key={job.id} job={job} />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
         </div>
       </div>
