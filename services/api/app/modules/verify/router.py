@@ -73,6 +73,58 @@ async def get_job(
     return job
 
 
+@router.get("/jobs/{job_id}/media")
+async def get_job_media(
+    job_id: uuid.UUID,
+    db=Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Proxy the uploaded file from MinIO — used for thumbnails in the UI."""
+    import asyncio
+    import io
+    from fastapi.responses import StreamingResponse
+
+    job = (await db.execute(select(VerifyJob).where(VerifyJob.id == job_id))).scalar_one_or_none()
+    if not job or not job.minio_key:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    settings = get_settings()
+
+    def _download():
+        from minio import Minio
+        bucket, *kparts = job.minio_key.split("/", 1)
+        obj_key = kparts[0] if kparts else job.minio_key
+        c = Minio(
+            settings.minio_endpoint,
+            access_key=getattr(settings, "minio_user", ""),
+            secret_key=getattr(settings, "minio_password", ""),
+            secure=False,
+        )
+        return c.get_object(bucket, obj_key).read()
+
+    try:
+        data = await asyncio.to_thread(_download)
+    except Exception:
+        raise HTTPException(status_code=404, detail="File not found in storage")
+
+    ext = job.filename.rsplit(".", 1)[-1].lower() if "." in job.filename else ""
+    CT: dict[str, str] = {
+        "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+        "gif": "image/gif", "webp": "image/webp", "tiff": "image/tiff", "bmp": "image/bmp",
+        "mp4": "video/mp4", "mov": "video/quicktime", "avi": "video/x-msvideo",
+        "mkv": "video/x-matroska", "webm": "video/webm",
+        "mp3": "audio/mpeg", "wav": "audio/wav", "m4a": "audio/mp4",
+        "ogg": "audio/ogg", "flac": "audio/flac",
+    }
+    content_type = CT.get(ext, "application/octet-stream")
+
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.delete("/jobs/{job_id}", status_code=204)
 async def delete_job(
     job_id: uuid.UUID,
