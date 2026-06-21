@@ -26,6 +26,14 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
+    task_routes={
+        "triage.*": {"queue": "triage"},
+        "verify.*": {"queue": "triage"},
+        "simulation.*": {"queue": "triage"},
+        "investigation.*": {"queue": "intel"},
+        "requirements.*": {"queue": "intel"},
+        "darkweb.*": {"queue": "intel"},
+    },
     # Beat schedule — periodic ingestion
     beat_schedule={
         "poll-all-sources": {

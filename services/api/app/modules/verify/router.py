@@ -43,7 +43,7 @@ async def upload_for_verify(
     await upload_to_minio(data, job.minio_key, content_type)
 
     # Trigger async verification
-    run_verify_pipeline.delay(str(job.id))
+    run_verify_pipeline.apply_async((str(job.id),), queue="triage")
 
     return job
 
