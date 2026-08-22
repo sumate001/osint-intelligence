@@ -1,0 +1,49 @@
+"""External signal intake — one table, no changes to any existing model.
+
+A signal is a lead pushed in by Horizon, not a case. It becomes a case only when
+an analyst accepts it, which is why `investigation_case_id` is nullable and the
+row carries its own lifecycle independent of the Investigation module.
+"""
+
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ...core.db import Base
+
+STATUSES = ("pending_review", "accepted", "dismissed", "closed")
+VERDICTS = ("true_signal", "false_signal", "inconclusive")
+CALLBACK_STATUSES = ("pending", "delivered", "failed", "disabled")
+
+
+class ExternalSignal(Base):
+    __tablename__ = "external_signals"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_system: Mapped[str] = mapped_column(String(50), default="horizon", nullable=False)
+    #: Horizon's dispatch id. Unique, and the idempotency key for re-delivery.
+    signal_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), unique=True, nullable=False, index=True
+    )
+    signal_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(Text, default="")
+    #: The inbound body kept verbatim — the analyst view renders from this, and
+    #: it is the audit record of what we were actually told.
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="pending_review", nullable=False, index=True)
+    investigation_case_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cases.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    verdict: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    analyst_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    callback_status: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    #: Kept for operators: "which callbacks are stuck, and how hard did we try?"
+    callback_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
+    callback_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

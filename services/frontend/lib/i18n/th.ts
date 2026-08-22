@@ -85,6 +85,37 @@ const th = {
     score: "คะแนน",
     admiralty: "Admiralty",
   },
+  signals: {
+    title: "สัญญาณจาก Horizon",
+    subtitle:
+      "สัญญาณคือเบาะแสที่ระบบเรดาร์ส่งเข้ามา ยังไม่ใช่ Case — จะกลายเป็น Case ต่อเมื่อนักวิเคราะห์รับเรื่อง",
+    tab_pending: "รอพิจารณา",
+    tab_accepted: "รับแล้ว",
+    tab_dismissed: "ตีกลับ",
+    tab_closed: "ปิดแล้ว",
+    tab_all: "ทั้งหมด",
+    empty: "ยังไม่มีสัญญาณ",
+    empty_hint: "Horizon จะส่งสัญญาณเข้ามาเมื่อคะแนนผ่านเกณฑ์",
+    top_events: "เหตุการณ์ที่เกี่ยวข้อง",
+    forces: "แรงขับเคลื่อน (impact / uncertainty)",
+    note: "บันทึกนักวิเคราะห์",
+    accept: "รับเรื่อง — สร้าง Case",
+    dismiss: "ตีกลับ",
+    confirm_dismiss: "ยืนยันตีกลับ",
+    dismiss_reason_placeholder: "เหตุผลที่ตีกลับ (จำเป็น)",
+    dismiss_hint: "เหตุผลนี้จะถูกส่งกลับไปที่ Horizon เพื่อปรับความแม่นยำของเรดาร์",
+    open_case: "เปิด Case ที่เกี่ยวข้อง",
+    callback_failed: "ส่ง verdict กลับไม่สำเร็จ",
+    verdict_true_signal: "จริง",
+    verdict_false_signal: "หลอก",
+    verdict_inconclusive: "สรุปไม่ได้",
+    from_horizon: "จาก Horizon",
+    close_title: "ปิด Case — สรุปผลสัญญาณ",
+    close_hint: "ผลสรุปนี้จะถูกส่งกลับไปที่ Horizon เพื่อใช้ปรับเกณฑ์การแจ้งเตือน",
+    close_verdict_label: "ผลสรุปสัญญาณ",
+    close_note_placeholder: "บันทึกเพิ่มเติม (ไม่บังคับ)",
+    close_submit: "ปิด Case และส่งผลกลับ",
+  },
   investigation: {
     title: "สืบสวน",
     new_case: "Case ใหม่",
@@ -271,7 +302,7 @@ const th = {
       all_levels: "ทุก level",
     },
   },
-} as const;
+};
 
 export default th;
 export type TranslationKeys = typeof th;

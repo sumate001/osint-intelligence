@@ -39,3 +39,6 @@ Thumbs.db
 # Dark web — never commit
 services/darkweb/blocklist.txt
 **/chain_of_custody/
+
+# Build artifact — regenerated on every typecheck, and it blocked a stash/merge
+services/frontend/tsconfig.tsbuildinfo

@@ -1,5 +1,9 @@
 {
   "compilerOptions": {
+    // Without this TypeScript defaults to ES5 and refuses to iterate a Set,
+    // even though `lib` already promises esnext and Next.js targets modern
+    // browsers. Setting it fixes the downlevelIteration errors outright.
+    "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

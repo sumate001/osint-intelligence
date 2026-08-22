@@ -67,6 +67,15 @@ class Settings(BaseSettings):
     # Ingestion
     rss_poll_interval_seconds: int = 300  # 5 minutes
 
+    # Horizon integration (external signal intake)
+    # Key Horizon must present on POST /api/v1/signals/inbound. Unset refuses
+    # every inbound call rather than accepting unauthenticated ones.
+    horizon_inbound_api_key: str = ""
+    # Where to send verdicts back. Unset skips the callback silently — that is a
+    # deployment choice, not a failure.
+    horizon_base_url: str = ""
+    horizon_api_key: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

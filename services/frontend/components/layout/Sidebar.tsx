@@ -19,10 +19,12 @@ import {
   Target,
   Zap,
   Globe,
+  Radar,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useRouter } from "next/navigation";
 import { LOCALES, LOCALE_LABELS } from "@/lib/i18n";
+import { useSignalCount } from "@/lib/hooks/useSignals";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -31,11 +33,19 @@ export function Sidebar() {
   const { locale, setLocale } = useLocaleStore();
   const router = useRouter();
   const t = useT();
+  // Badge counter is the notification mechanism for incoming signals.
+  const { data: signalCount } = useSignalCount();
 
   const NAV_ITEMS = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: t("nav.today"), href: "/today", icon: Newspaper },
     { label: t("nav.investigation"), href: "/investigation", icon: Search },
+    {
+      label: t("signals.title"),
+      href: "/investigation/signals",
+      icon: Radar,
+      badge: signalCount?.pending_review || 0,
+    },
     { label: t("nav.verify"), href: "/verify", icon: ShieldCheck },
     { label: t("nav.brief"), href: "/brief", icon: FileText },
     { label: t("nav.intelligence"), href: "/intelligence", icon: Target },
@@ -76,7 +86,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-3 space-y-0.5 px-1.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+        {NAV_ITEMS.map(({ label, href, icon: Icon, badge }: any) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -92,6 +102,11 @@ export function Sidebar() {
             >
               <Icon size={16} className="shrink-0" />
               {!collapsed && <span>{label}</span>}
+              {badge > 0 && (
+                <span className="ml-auto rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  {badge}
+                </span>
+              )}
             </Link>
           );
         })}

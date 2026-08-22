@@ -585,3 +585,51 @@ If `HORIZON_BASE_URL` is unset, the verdict callback is skipped silently (log at
 - No changes to Horizon itself (separate repo, separate CLAUDE.md).
 - No automatic case creation without analyst acceptance.
 - No syncing of case contents back to Horizon beyond the verdict payload.
+
+## Implementation notes (module built — read before changing it)
+
+Lives in `app/modules/signals/` and follows the standard module layout. Nothing
+outside it was modified except four additive lines: the router registration in
+`main.py`, the task module and queue route in `worker.py`, the model import in
+`alembic/env.py`, and three settings in `core/config.py`.
+
+**Endpoints** (`/api/v1/signals`):
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/inbound` | `X-API-Key` (Horizon) | `202 {osint_signal_id}`, idempotent on `signal_id` |
+| GET | `` | session | list, `?status=` filter |
+| GET | `/count` | session | badge counter for `pending_review` |
+| GET | `/{id}` | session | detail |
+| POST | `/{id}/accept` | session | creates a case, `201` with the case |
+| POST | `/{id}/dismiss` | session | reason required, fires the verdict callback |
+| POST | `/{id}/close` | session | verdict required, fires the verdict callback |
+| GET | `/by-case/{case_id}` | session | backs the origin badge; `404` = opened by hand |
+
+**Why `/close` lives here and not in Investigation.** The spec asks for a signal
+verdict when closing a signal-originated case. Putting that in the Investigation
+module's case update would change how every ordinary case closes. Instead the UI
+calls this endpoint for signal-originated cases only, and `PATCH /cases/{id}`
+behaves exactly as it did before this integration existed.
+
+**Idempotency** is the `signal_id UNIQUE` constraint, not application logic.
+Horizon retries anything that is not a 202, so this is the difference between
+one lead and five for the same story.
+
+**The verdict callback** is `signals.send_verdict` on the `intel` queue, retrying
+at 30s → 2m → 10m → 1h before `callback_status='failed'`. 5xx and 408/425/429
+are retried; any other 4xx means Horizon rejected the body and resending it
+unchanged would only repeat the rejection. `HORIZON_BASE_URL` unset →
+`callback_status='disabled'`, logged at INFO. A failed callback never blocks a
+case from closing.
+
+**Contracts.** `contracts/*.json` are copied from the Horizon repo and are the
+shared source of truth. `app/modules/signals/tests/test_service.py` validates
+both payloads against them and asserts the Pydantic models cover the same fields
+— if either repo renames something, the tests fail instead of the integration
+going quiet in production.
+
+**Frontend.** `app/(dashboard)/investigation/signals/page.tsx` is the inbox;
+`components/investigation/SignalOrigin.tsx` renders the origin badge and the
+close-with-verdict flow and returns `null` for cases opened by hand, so the case
+page gained one line rather than a branch. Sidebar carries the pending badge.

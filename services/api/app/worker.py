@@ -14,6 +14,7 @@ celery_app = Celery(
         "app.modules.simulation.tasks",
         "app.modules.darkweb.tasks",
         "app.modules.requirements.tasks",
+        "app.modules.signals.tasks",
     ],
 )
 
@@ -33,6 +34,9 @@ celery_app.conf.update(
         "investigation.*": {"queue": "intel"},
         "requirements.*": {"queue": "intel"},
         "darkweb.*": {"queue": "intel"},
+        # Verdict callbacks are light but retry for up to an hour; the intel
+        # worker has the concurrency headroom to hold them.
+        "signals.*": {"queue": "intel"},
     },
     # Beat schedule — periodic ingestion
     beat_schedule={

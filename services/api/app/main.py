@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
     from .modules.knowledge.router import router as knowledge_router
     from .modules.simulation.router import router as simulation_router
     from .modules.darkweb.router import router as darkweb_router
+    from .modules.signals.router import router as signals_router
     from .modules.admin.router import router as admin_router
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(knowledge_router, prefix="/api/v1/knowledge", tags=["knowledge"])
     app.include_router(simulation_router, prefix="/api/v1/simulation", tags=["simulation"])
     app.include_router(darkweb_router, prefix="/api/v1/darkweb", tags=["darkweb"])
+    app.include_router(signals_router, prefix="/api/v1/signals", tags=["signals"])
     app.include_router(admin_router)
 
     @app.get("/health", tags=["system"])

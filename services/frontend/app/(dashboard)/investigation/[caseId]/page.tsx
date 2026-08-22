@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Topbar } from "@/components/layout/Topbar";
+import { SignalOrigin } from "@/components/investigation/SignalOrigin";
 import { NetworkGraph } from "@/components/investigation/NetworkGraph";
 import { EvidenceBoard } from "@/components/investigation/EvidenceBoard";
 import { Timeline } from "@/components/investigation/Timeline";
@@ -192,6 +193,8 @@ export default function CasePage() {
 
           {/* Tab content */}
           <div className="flex-1 overflow-hidden p-4">
+            {/* Renders nothing unless this case came from a Horizon signal. */}
+            <SignalOrigin caseId={caseId} />
             {activeTab === "graph" && (
               <div className="h-full rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
                 <NetworkGraph graph={graph} />

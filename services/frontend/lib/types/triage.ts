@@ -4,6 +4,9 @@ export interface FeedItem {
   id: string;
   external_id: string;
   source_id: string;
+  // Present on the wire — triage/models.py and schemas.py both carry it — but
+  // never added to this type, which broke the production type check.
+  source_name: string | null;
   source_type: string;
   title: string;
   body: string;

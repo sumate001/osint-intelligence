@@ -325,7 +325,11 @@ export function NetworkGraph({ graph }: Props) {
     Promise.all([import("3d-force-graph"), import("three")])
       .then(([{ default: ForceGraph3D }, THREE]) => {
         if (cancelled || !container) return;
-        fg = ForceGraph3D({ antialias: true, alpha: true })(container)
+        // `ForceGraph3D(config)(container)` is the library's documented API, but
+        // its bundled types model the factory's return as non-callable. The
+        // runtime is right and the declaration is wrong.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fg = (ForceGraph3D as any)({ antialias: true, alpha: true })(container)
           .graphData({ nodes, links }).backgroundColor("#0D0F14").showNavInfo(false)
           .nodeThreeObject((n: G3Node) => {
             const color = NODE_COLORS[n.type] ?? NODE_COLORS.entity;
