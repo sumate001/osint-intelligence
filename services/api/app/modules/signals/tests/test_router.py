@@ -15,10 +15,9 @@ import pytest
 # only importable where the full dependency set is installed.
 pytest.importorskip("fastapi", reason="integration tests run inside the api container")
 
-from httpx import ASGITransport, AsyncClient  # noqa: E402
+# httpx client comes from conftest
 
 from app.core.config import get_settings  # noqa: E402
-from app.main import app  # noqa: E402
 from app.modules.signals import service  # noqa: E402
 from app.modules.signals.schemas import SignalInbound  # noqa: E402
 
@@ -51,12 +50,11 @@ def body(signal_id: str | None = None) -> dict:
     }
 
 
-@pytest.fixture
-async def client():
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as http:
-        yield http
+# `client` and `db` come from conftest.py. Do not redefine `client` here: a local
+# one that skips the get_db override leaves the app on its own module-level
+# engine, whose pooled connections then outlive the per-test event loop. The
+# symptom is a suite where whichever DB-touching test runs second dies with
+# "attached to a different loop", and rows leak into the real database.
 
 
 @pytest.fixture

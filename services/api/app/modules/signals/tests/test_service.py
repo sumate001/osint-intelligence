@@ -5,6 +5,7 @@ are shared byte-for-byte with the Horizon repo. If either side renames a field,
 these fail rather than the integration silently going quiet in production.
 """
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,16 +26,29 @@ from app.modules.signals.service import _case_description
 from app.modules.signals.tasks import BACKOFF_SECONDS, is_retryable
 
 def _contracts_dir() -> Path:
-    """Walk up to the repo's contracts/ rather than counting parent hops.
+    """Locate the shared contracts/ directory.
 
-    Counting is silently wrong the moment the module moves, and the failure
-    reads as a missing contract rather than a bad path.
+    Walking up from this file covers a checkout. Inside the api container it
+    does not: the image is built from services/api, so contracts/ — which lives
+    at the repo root — is outside the build context and cannot be COPYed in.
+    Compose bind-mounts the repo at /repo, which is where it turns up there.
+
+    Searching beats counting parent hops, which goes silently wrong the moment
+    the module moves and fails as "missing contract" rather than "bad path".
     """
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / "contracts" / "verdict.schema.json"
+    roots = [*Path(__file__).resolve().parents]
+    if env := os.getenv("CONTRACTS_DIR"):
+        roots.insert(0, Path(env).parent)
+    roots.append(Path("/repo"))
+
+    for root in roots:
+        candidate = root / "contracts" / "verdict.schema.json"
         if candidate.exists():
             return candidate.parent
-    raise RuntimeError("contracts/ not found — it is the shared source of truth with Horizon")
+    raise RuntimeError(
+        "contracts/ not found — it is the shared source of truth with Horizon. "
+        "Set CONTRACTS_DIR if it lives somewhere unusual."
+    )
 
 
 CONTRACTS = _contracts_dir()
