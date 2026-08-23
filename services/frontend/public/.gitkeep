@@ -1,0 +1,4 @@
+Next.js serves static assets from this directory, and the production Dockerfile
+copies it unconditionally. It was never committed, so `docker compose build
+frontend` failed at "COPY /app/public: not found" — the production image has
+never been buildable. Keeping the directory tracked fixes that.

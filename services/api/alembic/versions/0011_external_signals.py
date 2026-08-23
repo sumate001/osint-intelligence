@@ -1,4 +1,4 @@
-"""Phase 6: external_signals — Horizon signal intake
+"""Phase 11: external_signals — Horizon signal intake
 
 One new table. Nothing existing is touched: the integration adds a lane into
 Investigation, it does not change how Investigation works.
@@ -7,8 +7,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "0006"
-down_revision = "0005"
+revision = "0011"
+down_revision = "0010"
 branch_labels = None
 depends_on = None
 

@@ -14,6 +14,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ...core.db import Base
 
+# The FK below points at investigation's `cases` table, and SQLAlchemy resolves
+# that by name against the shared metadata. The API process happens to import
+# every module's models via main.py, but a Celery worker importing only this one
+# would fail to configure the mapper — which is exactly how the verdict callback
+# first broke: the HTTP POST succeeded and the task then died recording it.
+from ..investigation.models import Case  # noqa: F401
+
 STATUSES = ("pending_review", "accepted", "dismissed", "closed")
 VERDICTS = ("true_signal", "false_signal", "inconclusive")
 CALLBACK_STATUSES = ("pending", "delivered", "failed", "disabled")
