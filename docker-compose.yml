@@ -190,6 +190,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL:         ""         # empty → Next.js rewrites handle /api/*
         NEXT_PUBLIC_PERPLEXICA_URL:  ${NEXT_PUBLIC_PERPLEXICA_URL:-http://localhost:3002}
+        NEXT_PUBLIC_HORIZON_UI_URL:  ${NEXT_PUBLIC_HORIZON_UI_URL:-http://localhost:8301}
     container_name: osint-frontend
     environment:
       NODE_ENV:              production

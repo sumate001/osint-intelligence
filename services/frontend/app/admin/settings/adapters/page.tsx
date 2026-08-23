@@ -111,12 +111,15 @@ function AddSourceModal({
               />
             </Field>
 
-            <Field label="Poll Interval (วินาที)" error={errors.poll_interval_seconds?.message}>
+            {/* Kept because the field is still required by SourceCreate, but
+                nothing reads it now that the beat schedule is empty. */}
+            <Field label="Poll Interval (ไม่มีผล)" error={errors.poll_interval_seconds?.message}>
               <input
                 {...register("poll_interval_seconds", { valueAsNumber: true })}
                 type="number"
                 min="60"
-                className={inputCls}
+                disabled
+                className={cn(inputCls, "opacity-40 cursor-not-allowed")}
               />
             </Field>
           </div>
@@ -228,11 +231,41 @@ export default function AdaptersPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto space-y-4">
+          {/* The schedule that used to drive this page is off (worker.py:
+              beat_schedule={}). Leaving the UI unchanged would have people add
+              a feed here and wait for articles that never arrive. */}
+          <div className="bg-[var(--surface)] border border-[var(--yellow)]/40 rounded-xl p-4 flex gap-3">
+            <AlertCircle size={16} className="text-[var(--yellow)] shrink-0 mt-0.5" />
+            <div className="text-xs leading-relaxed text-[var(--text-2)]">
+              <p className="text-[var(--text)] font-medium mb-1">
+                การดึงข่าวตามรอบเวลาย้ายไปอยู่ที่ Horizon แล้ว
+              </p>
+              <p>
+                Horizon เป็นผู้จัดการขาเข้าทั้งหมด — ดึงข่าว ให้คะแนน รวมข่าวซ้ำ
+                และจัดกลุ่มเป็นเรื่องเดียวกันข้ามวัน แล้วส่งต่อมาที่นี่เมื่อเรื่องโตพอ
+                ถ้าดึงซ้ำที่นี่ด้วย ข่าวชิ้นเดียวกันจะถูกนับเป็นหลายเรื่อง
+                เพราะฝั่งนี้เทียบซ้ำจาก URL ตรง ๆ เท่านั้น
+              </p>
+              <p className="mt-2">
+                เพิ่มหรือแก้แหล่งข่าวที่{" "}
+                <a
+                  href={`${process.env.NEXT_PUBLIC_HORIZON_UI_URL || "http://localhost:8301"}/sources`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[var(--accent)] hover:underline"
+                >
+                  Horizon → แหล่งข่าว
+                </a>{" "}
+                · รายการด้านล่างยังใช้กด Run ดึงครั้งเดียวได้ แต่ค่า Interval ไม่มีผลแล้ว
+              </p>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-[var(--text)]">Ingestion Sources</h2>
               <p className="text-xs text-[var(--text-2)] mt-0.5">
-                จัดการ adapter ที่ดึงข้อมูลเข้าระบบ
+                adapter เดิม — ดึงเองได้ครั้งต่อครั้ง ไม่มีรอบอัตโนมัติ
               </p>
             </div>
             <button onClick={() => setShowAdd(true)} className={cn(primaryBtn, "flex items-center gap-2")}>
@@ -328,7 +361,9 @@ function SourceRow({
 
           <div className="flex items-center gap-4 text-[10px] text-[var(--text-3)]">
             <span>Weight: <span className="text-[var(--text-2)]">{source.source_weight}</span></span>
-            <span>Interval: <span className="text-[var(--text-2)]">{source.poll_interval_seconds}s</span></span>
+            <span className="line-through decoration-[var(--text-3)]" title="ไม่มีรอบอัตโนมัติแล้ว — Horizon เป็นคนดึง">
+              Interval: {source.poll_interval_seconds}s
+            </span>
             {source.last_fetched_at && (
               <span>Last fetch: <span className="text-[var(--text-2)]">{formatDate(source.last_fetched_at, "dd MMM HH:mm")}</span></span>
             )}

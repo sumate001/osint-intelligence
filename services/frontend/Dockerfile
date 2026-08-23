@@ -14,8 +14,12 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG NEXT_PUBLIC_API_URL=""
 ARG NEXT_PUBLIC_PERPLEXICA_URL="http://localhost:3002"
+# Horizon UI runs as its own stack, so this is a browser-facing URL, not a
+# service name — the link would not resolve from inside the compose network.
+ARG NEXT_PUBLIC_HORIZON_UI_URL="http://localhost:8301"
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_PERPLEXICA_URL=$NEXT_PUBLIC_PERPLEXICA_URL
+ENV NEXT_PUBLIC_HORIZON_UI_URL=$NEXT_PUBLIC_HORIZON_UI_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 

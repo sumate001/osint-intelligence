@@ -241,6 +241,7 @@ services:
       INTERNAL_SEARXNG_URL: http://searxng:8080
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_PERPLEXICA_URL: http://localhost:3002
+      NEXT_PUBLIC_HORIZON_UI_URL: http://localhost:8301
     depends_on:
       - api
     restart: unless-stopped
