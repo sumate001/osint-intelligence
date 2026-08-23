@@ -50,6 +50,11 @@ export interface FeedResponse {
 
 export interface FeedCounts {
   available: boolean;
-  counts: Partial<Record<TriageVerdict | "ALL", number>>;
+  /**
+   * ALL is every event, not the sum of the verdicts. UNSCORED is the gap —
+   * events ingested before editorial scoring existed. It shrinks to zero as
+   * they age out; it is not a backlog anyone has to clear.
+   */
+  counts: Partial<Record<TriageVerdict | "ALL" | "UNSCORED", number>>;
   error?: string;
 }
