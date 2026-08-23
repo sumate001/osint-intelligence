@@ -45,6 +45,7 @@ def body(signal_id: str | None = None) -> dict:
             }
         ],
         "force_assessments": [{"force": "เศรษฐกิจ", "impact": 0.8, "uncertainty": 0.5}],
+        "cluster_id": None,
         "scenario_id": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }

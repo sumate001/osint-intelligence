@@ -82,6 +82,7 @@ def inbound_body(**overrides) -> dict:
         "force_assessments": [
             {"force": "เศรษฐกิจและการเงิน", "impact": 0.79, "uncertainty": 0.5}
         ],
+        "cluster_id": "4b654b6a-921b-4fc3-91f2-8142b95bbbbf",
         "scenario_id": "bc150194-6cf0-4f90-94c5-deb1bd3f7c88",
         "created_at": "2026-08-22T08:00:00+00:00",
     }

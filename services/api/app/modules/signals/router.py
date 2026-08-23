@@ -5,6 +5,7 @@ Two audiences on one router:
   - everything else is analyst-facing, authenticated by the normal user session
 """
 
+import logging
 import uuid
 from typing import Annotated
 
@@ -14,6 +15,7 @@ from ...core.auth import get_current_user
 from ...core.config import get_settings
 from ...core.db import get_db
 from ..investigation.schemas import CaseOut
+from . import horizon_client as horizon
 from . import service
 from .schemas import (
     SignalAccept,
@@ -26,6 +28,8 @@ from .schemas import (
     SignalOut,
 )
 from .tasks import send_verdict
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -58,6 +62,44 @@ async def receive_signal(data: SignalInbound, db=Depends(get_db)):
     """
     signal, _created = await service.ingest(db, data)
     return SignalInboundAck(osint_signal_id=str(signal.id))
+
+
+# ── The inbound stream, read from Horizon ────────────────────────────────────
+
+
+@router.get("/feed")
+async def feed(
+    verdict: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    order: str = Query("recent", pattern="^(recent|score)$"),
+    _: dict = Depends(get_current_user),
+):
+    """The scored inbound stream.
+
+    Horizon does the ingesting and the scoring now; this is a read-through so
+    the browser talks to one origin. Unreachable Horizon returns an empty feed
+    with `available: false` rather than an error — a monitoring problem should
+    not look like a broken page.
+    """
+    try:
+        return {
+            "available": True,
+            "items": await horizon.list_events(
+                limit=limit, offset=offset, verdict=verdict, order=order
+            ),
+        }
+    except horizon.HorizonUnavailable as exc:
+        log.warning("feed unavailable", extra={"error": str(exc)})
+        return {"available": False, "items": [], "error": str(exc)}
+
+
+@router.get("/feed/counts")
+async def feed_counts(_: dict = Depends(get_current_user)):
+    try:
+        return {"available": True, "counts": await horizon.event_counts()}
+    except horizon.HorizonUnavailable as exc:
+        return {"available": False, "counts": {}, "error": str(exc)}
 
 
 # ── Analyst-facing ───────────────────────────────────────────────────────────

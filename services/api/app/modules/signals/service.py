@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from . import horizon_client as horizon
 from ..investigation import service as investigation
 from ..investigation.schemas import CaseCreate, EvidenceCreate
 from .models import ExternalSignal
@@ -128,6 +129,56 @@ def _case_description(signal: ExternalSignal) -> str:
     return "\n".join(lines)
 
 
+async def _evidence_seed(signal: ExternalSignal) -> tuple[list[dict], str]:
+    """What the new case starts with, and where it came from.
+
+    Prefers the cluster's full timeline pulled from Horizon at this moment: the
+    cluster keeps growing after its signal fires, so by the time an analyst
+    accepts — often a day later — the thread is materially longer than the
+    snapshot the payload carried. Falls back to that snapshot when Horizon is
+    unreachable, because a case with ten events beats no case at all.
+    """
+    payload = signal.payload or {}
+    cluster_id = payload.get("cluster_id") or (
+        signal.signal_type == "trend_breakout" and payload.get("signal_id")
+    )
+
+    if cluster_id:
+        try:
+            thread = await horizon.cluster_timeline(uuid.UUID(str(cluster_id)))
+            events = thread.get("timeline") or []
+            if events:
+                return events, "timeline"
+        except (horizon.HorizonUnavailable, ValueError) as exc:
+            log.warning(
+                "could not fetch the cluster timeline, falling back to top_events",
+                extra={"osint_signal_id": str(signal.id), "error": str(exc)},
+            )
+
+    return payload.get("top_events", []), "top_events"
+
+
+def _evidence_from(event: dict) -> EvidenceCreate:
+    triage = event.get("triage") or {}
+    lines = [
+        f"แหล่งข่าว: {event.get('source_name') or '-'}",
+        f"ความน่าเชื่อถือ: {event.get('credibility_weight', 0):.2f}",
+        f"เวลาเหตุการณ์: {event.get('event_time') or 'ไม่ระบุ'}",
+    ]
+    if triage.get("verdict"):
+        lines.append(f"triage: {triage['verdict']} ({triage.get('total')})")
+    if event.get("source_count", 1) > 1:
+        lines.append(f"ยืนยันจาก {event['source_count']} แหล่ง")
+
+    return EvidenceCreate(
+        title=(event.get("summary") or "")[:500] or "(ไม่มีคำอธิบาย)",
+        content="\n".join(lines),
+        url=event.get("url") or None,
+        status=SIGNAL_EVIDENCE_STATUS,
+        source_type=SIGNAL_EVIDENCE_SOURCE,
+    )
+
+
 async def accept(
     db: AsyncSession, signal: ExternalSignal, data: SignalAccept, user_id: str
 ):
@@ -146,23 +197,9 @@ async def accept(
         user_id=user_id,
     )
 
-    # top_events become starting evidence, most credible first.
-    for event in (signal.payload or {}).get("top_events", []):
-        await investigation.add_evidence(
-            db,
-            case.id,
-            EvidenceCreate(
-                title=(event.get("summary") or "")[:500] or "(ไม่มีคำอธิบาย)",
-                content=(
-                    f"แหล่งข่าว: {event.get('source_name') or '-'}\n"
-                    f"ความน่าเชื่อถือ: {event.get('credibility_weight', 0):.2f}\n"
-                    f"เวลาเหตุการณ์: {event.get('event_time') or 'ไม่ระบุ'}"
-                ),
-                url=event.get("url") or None,
-                status=SIGNAL_EVIDENCE_STATUS,
-                source_type=SIGNAL_EVIDENCE_SOURCE,
-            ),
-        )
+    events, origin = await _evidence_seed(signal)
+    for event in events:
+        await investigation.add_evidence(db, case.id, _evidence_from(event))
 
     if data.assigned_to:
         case.assigned_to = data.assigned_to
@@ -176,7 +213,8 @@ async def accept(
         extra={
             "osint_signal_id": str(signal.id),
             "case_id": str(case.id),
-            "evidence": len((signal.payload or {}).get("top_events", [])),
+            "evidence": len(events),
+            "evidence_source": origin,
         },
     )
     return case

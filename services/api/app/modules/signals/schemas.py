@@ -45,6 +45,9 @@ class SignalInbound(BaseModel):
     summary: str = ""
     top_events: list[TopEvent] = Field(default_factory=list, max_length=10)
     force_assessments: list[ForceAssessment] = []
+    #: Lets us fetch the full timeline from Horizon when an analyst accepts.
+    #: Null for a weak signal raised on a single unclustered event.
+    cluster_id: uuid.UUID | None = None
     scenario_id: uuid.UUID | None = None
     created_at: datetime
 
