@@ -38,14 +38,15 @@ celery_app.conf.update(
         # worker has the concurrency headroom to hold them.
         "signals.*": {"queue": "intel"},
     },
-    # Beat schedule — periodic ingestion
-    beat_schedule={
-        "poll-all-sources": {
-            "task": "triage.poll_all_sources",
-            "schedule": 60.0,
-            "options": {"queue": "triage"},
-        },
-    },
+    # Ingestion moved to Horizon, which owns the whole inbound path — fetching,
+    # editorial triage, dedup and clustering. Polling here as well would score
+    # the same articles twice and, worse, count one story as several because
+    # this side only deduplicates on exact URL.
+    #
+    # The triage module and its adapters are left in place rather than deleted:
+    # they still serve the manual re-score path, and removing them would be a
+    # much larger change than turning off a schedule.
+    beat_schedule={},
 )
 
 

@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/layout/Topbar";
-import { useFeedStats } from "@/lib/hooks/useFeedItems";
+// Verdict tallies now come from Horizon, which does the scoring.
+import { useHorizonFeedCounts } from "@/lib/hooks/useHorizonFeed";
 import { useCases } from "@/lib/hooks/useCase";
 import { useServiceHealth } from "@/lib/hooks/useAdmin";
 import { useAdminSettings } from "@/lib/hooks/useAdmin";
@@ -251,7 +252,13 @@ function LogRow({ log, expanded, onToggle }: {
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { data: feedStats }    = useFeedStats();
+  const { data: feedCounts }   = useHorizonFeedCounts();
+  const feedStats = {
+    priority: feedCounts?.counts?.PRIORITY,
+    investigate: feedCounts?.counts?.INVESTIGATE,
+    fast_track: feedCounts?.counts?.FAST_TRACK,
+    total: feedCounts?.counts?.ALL,
+  };
   const { data: casesData }    = useCases({ status: "ACTIVE", page: 1 });
   const { data: services = [], isFetching: healthLoading } = useServiceHealth();
   const { data: settings }     = useAdminSettings();
@@ -343,7 +350,7 @@ export default function DashboardPage() {
                     icon={<Newspaper size={14} />}
                     label="Feed Triage"
                     href="/today"
-                    metric={feedStats ? feedStats.total : "—"}
+                    metric={feedStats.total ?? "—"}
                     meta={`${feedStats?.priority ?? 0} priority · ${feedStats?.investigate ?? 0} investigate`}
                     accent="var(--accent)"
                     status={(feedStats?.priority ?? 0) > 0 ? "warn" : feedStats ? "ok" : "idle"}
