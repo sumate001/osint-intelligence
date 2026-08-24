@@ -173,3 +173,118 @@ async def test_closing_marks_the_linked_case_closed_too(db):
     assert signal.verdict == "true_signal"
     assert signal.callback_status == "pending"
     assert reloaded.status == "CLOSED"
+
+
+# ── cross-case memory ────────────────────────────────────────────────────────
+
+
+async def test_accepting_records_who_the_case_is_about(db, monkeypatch):
+    """Accepting a signal should populate the entity store, not just the case.
+
+    Nothing wrote to that store before, so "have we investigated this person
+    before" had one answer — no — regardless of the truth.
+    """
+    from app.modules.knowledge import service as knowledge
+    from app.modules.signals import horizon_client, service as signals
+    from app.modules.signals.schemas import SignalAccept
+
+    cluster = "11111111-1111-1111-1111-111111111111"
+
+    async def fake_entities(cluster_id, *, limit=50):
+        assert str(cluster_id) == cluster
+        return {
+            "entities": [
+                {
+                    "entity_id": "h-1",
+                    "canonical_name": "อนุทิน ชาญวีรกูล",
+                    "entity_type": "person",
+                    "qid": "Q16139757",
+                    "events": 4,
+                },
+                {
+                    "entity_id": "h-2",
+                    "canonical_name": "กรมชลประทาน",
+                    "entity_type": "org",
+                    "qid": "Q13012478",
+                    "events": 2,
+                },
+            ]
+        }
+
+    monkeypatch.setattr(horizon_client, "cluster_entities", fake_entities)
+    monkeypatch.setattr(signals.horizon, "cluster_entities", fake_entities)
+
+    payload = body()
+    payload["cluster_id"] = cluster
+    signal, _ = await service.ingest(db, SignalInbound(**payload))
+    case = await service.accept(db, signal, SignalAccept(), user_id="analyst-1")
+    await db.commit()
+
+    cast = await knowledge.case_cast(db, str(case.id))
+    assert {member.entity_name for member in cast} == {"อนุทิน ชาญวีรกูล", "กรมชลประทาน"}
+    assert {member.qid for member in cast} == {"Q16139757", "Q13012478"}
+
+
+async def test_the_second_case_can_see_the_first(db, monkeypatch):
+    """The whole point: an analyst opening case two learns about case one."""
+    from app.modules.knowledge import service as knowledge
+    from app.modules.signals import horizon_client, service as signals
+    from app.modules.signals.schemas import SignalAccept
+
+    async def fake_entities(cluster_id, *, limit=50):
+        # Deliberately a different spelling the second time round — a name match
+        # would see two strangers and report no prior cases.
+        return {
+            "entities": [
+                {
+                    "entity_id": "h-1",
+                    "canonical_name": "Anutin Charnvirakul",
+                    "entity_type": "person",
+                    "qid": "Q16139757",
+                    "events": 1,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(horizon_client, "cluster_entities", fake_entities)
+    monkeypatch.setattr(signals.horizon, "cluster_entities", fake_entities)
+
+    await knowledge.upsert_entity(
+        db,
+        entity_name="อนุทิน ชาญวีรกูล",
+        entity_type="person",
+        case_id="earlier-case",
+        case_title="คดีก่อนหน้า",
+        qid="Q16139757",
+    )
+
+    payload = body()
+    payload["cluster_id"] = "22222222-2222-2222-2222-222222222222"
+    signal, _ = await service.ingest(db, SignalInbound(**payload))
+    case = await service.accept(db, signal, SignalAccept(), user_id="analyst-1")
+    await db.commit()
+
+    cast = await knowledge.case_cast(db, str(case.id))
+    assert len(cast) == 1
+    assert [ref.case_title for ref in cast[0].prior_cases] == ["คดีก่อนหน้า"]
+
+
+async def test_a_case_still_opens_when_horizon_is_down(db, monkeypatch):
+    """Memory is worth having, but not at the price of the case itself."""
+    from app.modules.signals import horizon_client, service as signals
+    from app.modules.signals.schemas import SignalAccept
+
+    async def unavailable(cluster_id, *, limit=50):
+        raise horizon_client.HorizonUnavailable("connection refused")
+
+    monkeypatch.setattr(horizon_client, "cluster_entities", unavailable)
+    monkeypatch.setattr(signals.horizon, "cluster_entities", unavailable)
+
+    payload = body()
+    payload["cluster_id"] = "33333333-3333-3333-3333-333333333333"
+    signal, _ = await service.ingest(db, SignalInbound(**payload))
+    case = await service.accept(db, signal, SignalAccept(), user_id="analyst-1")
+    await db.commit()
+
+    assert signal.status == "accepted"
+    assert signal.investigation_case_id == case.id

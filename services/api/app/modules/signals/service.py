@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import horizon_client as horizon
 from ..investigation import service as investigation
+from ..knowledge import service as knowledge
 from ..investigation.schemas import CaseCreate, EvidenceCreate
 from .models import ExternalSignal
 from .schemas import SignalAccept, SignalClose, SignalDismiss, SignalInbound
@@ -158,6 +159,57 @@ async def _evidence_seed(signal: ExternalSignal) -> tuple[list[dict], str]:
     return payload.get("top_events", []), "top_events"
 
 
+#: Horizon types entities more finely than the DESK store does. Anything
+#: without a mapping keeps its own label rather than being forced into "other",
+#: which would erase the distinction the resolver worked to establish.
+_ENTITY_TYPE_MAP = {"person": "person", "org": "company", "place": "location"}
+
+
+def _cluster_id_of(signal: ExternalSignal) -> str | None:
+    payload = signal.payload or {}
+    return payload.get("cluster_id") or (
+        payload.get("signal_id") if signal.signal_type == "trend_breakout" else None
+    )
+
+
+async def _record_cast(db: AsyncSession, signal: ExternalSignal, case) -> int:
+    """Record who the case is about, so the next case can find this one.
+
+    Runs after the case exists and never raises: institutional memory is worth
+    having, but not at the price of an analyst losing the case they just
+    accepted because Horizon happened to be down.
+    """
+    cluster_id = _cluster_id_of(signal)
+    if not cluster_id:
+        return 0
+    try:
+        found = await horizon.cluster_entities(uuid.UUID(str(cluster_id)))
+    except (horizon.HorizonUnavailable, ValueError) as exc:
+        log.warning(
+            "could not fetch the cast for this cluster",
+            extra={"osint_signal_id": str(signal.id), "error": str(exc)},
+        )
+        return 0
+
+    recorded = 0
+    for entity in found.get("entities", []):
+        name = (entity.get("canonical_name") or "").strip()
+        if not name:
+            continue
+        await knowledge.upsert_entity(
+            db,
+            entity_name=name,
+            entity_type=_ENTITY_TYPE_MAP.get(entity.get("entity_type"), "other"),
+            case_id=str(case.id),
+            case_title=case.title,
+            role=f"ปรากฏใน {entity.get('events', 1)} เหตุการณ์",
+            qid=entity.get("qid"),
+            horizon_entity_id=entity.get("entity_id"),
+        )
+        recorded += 1
+    return recorded
+
+
 def _evidence_from(event: dict) -> EvidenceCreate:
     triage = event.get("triage") or {}
     lines = [
@@ -208,6 +260,8 @@ async def accept(
     signal.investigation_case_id = case.id
     await db.flush()
 
+    cast = await _record_cast(db, signal, case)
+
     log.info(
         "signal accepted into a case",
         extra={
@@ -215,6 +269,7 @@ async def accept(
             "case_id": str(case.id),
             "evidence": len(events),
             "evidence_source": origin,
+            "entities_recorded": cast,
         },
     )
     return case

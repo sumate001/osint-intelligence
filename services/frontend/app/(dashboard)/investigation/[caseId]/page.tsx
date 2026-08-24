@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Topbar } from "@/components/layout/Topbar";
+import { CaseCast } from "@/components/investigation/CaseCast";
 import { SignalOrigin } from "@/components/investigation/SignalOrigin";
 import { NetworkGraph } from "@/components/investigation/NetworkGraph";
 import { EvidenceBoard } from "@/components/investigation/EvidenceBoard";
@@ -201,7 +202,11 @@ export default function CasePage() {
               </div>
             )}
             {activeTab === "timeline" && (
-              <div className="h-full overflow-y-auto">
+              <div className="h-full space-y-4 overflow-y-auto">
+                {/* Above the timeline: who this case is about is the first
+                    question a returning analyst asks, and prior cases are the
+                    answer they cannot get from the evidence list. */}
+                <CaseCast caseId={caseId} />
                 <Timeline evidence={evidence} />
               </div>
             )}

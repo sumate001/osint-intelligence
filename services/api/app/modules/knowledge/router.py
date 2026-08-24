@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from ...core.db import get_db
 from ...core.auth import get_current_user
-from .schemas import EntityRecordOut, PatternOut
+from .schemas import CastMemberOut, EntityRecordOut, PatternOut
 from . import service
 
 router = APIRouter()
@@ -22,3 +22,13 @@ async def get_patterns(min_cases: int = 2, db: AsyncSession = Depends(get_db), _
 @router.get("/entity/{entity_name}", response_model=EntityRecordOut | None)
 async def get_entity(entity_name: str, db: AsyncSession = Depends(get_db), _: dict = Depends(get_current_user)):
     return await service.get_entity(db, entity_name)
+
+
+@router.get("/case/{case_id}/cast", response_model=list[CastMemberOut])
+async def case_cast(
+    case_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Who this case is about, and which of them have turned up before."""
+    return await service.case_cast(db, case_id)

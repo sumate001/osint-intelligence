@@ -74,6 +74,17 @@ async def cluster_timeline(cluster_id: uuid.UUID, *, limit: int = 200) -> dict:
     return await _get(f"/api/v1/clusters/{cluster_id}/timeline", {"limit": limit})
 
 
+async def cluster_entities(cluster_id: uuid.UUID, *, limit: int = 50) -> dict:
+    """Who and what the cluster is about, already resolved by Horizon.
+
+    Names arrive merged across spellings and, where one honestly fits, carrying
+    a Wikidata Q-number. That identifier is what lets this side answer "have we
+    investigated this person before" truthfully — a name match would report no
+    prior cases for someone whose earlier case spelled them differently.
+    """
+    return await _get(f"/api/v1/clusters/{cluster_id}/entities", {"limit": limit})
+
+
 async def health() -> bool:
     try:
         await _get("/health")
