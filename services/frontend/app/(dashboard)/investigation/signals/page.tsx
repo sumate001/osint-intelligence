@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Radar, TrendingUp } from "lucide-react";
 
 import { ProfileBrief } from "@/components/investigation/ProfileBrief";
-import { SignalProfiles } from "@/components/investigation/SignalProfiles";
+import { BeatBar } from "@/components/investigation/BeatBar";
+import { ProfileForm } from "@/components/investigation/ProfileForm";
 import { Topbar } from "@/components/layout/Topbar";
 import { useT } from "@/lib/hooks/useT";
 import {
@@ -15,7 +16,7 @@ import {
   useSignals,
 } from "@/lib/hooks/useSignals";
 import type { DismissKind } from "@/lib/api/signals";
-import type { ExternalSignal, SignalStatus } from "@/lib/types/signals";
+import type { ExternalSignal, SignalProfile, SignalStatus } from "@/lib/types/signals";
 
 const TABS: { key: SignalStatus | "all"; labelKey: string }[] = [
   { key: "pending_review", labelKey: "signals.tab_pending" },
@@ -52,15 +53,7 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-function SignalRow({
-  signal,
-  profileName,
-}: {
-  signal: ExternalSignal;
-  /** Which box this landed in. Undefined means nobody asked for it, which is a
-   * real answer and reads differently from "we have not decided yet". */
-  profileName?: string;
-}) {
+function SignalRow({ signal }: { signal: ExternalSignal }) {
   const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -105,15 +98,6 @@ function SignalRow({
                 {c}
               </span>
             ))}
-            <span
-              className={`text-[11px] px-1.5 py-0.5 rounded ${
-                profileName
-                  ? "bg-[var(--accent)]/15 text-[var(--accent)]"
-                  : "bg-[var(--surface-3)] text-[var(--text-3)]"
-              }`}
-            >
-              {profileName ?? t("signals.box_unsorted")}
-            </span>
             {signal.verdict && (
               <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-2)]">
                 {t(`signals.verdict_${signal.verdict}` as never)}
@@ -290,16 +274,35 @@ function SignalRow({
 
 export default function SignalsInboxPage() {
   const t = useT();
+  // Two different questions, so two different views. "What we are following" is
+  // the newsroom's own agenda; "what came in anyway" is whatever the engine
+  // surfaced that nobody asked for. Mixing them was the confusion.
+  const [view, setView] = useState<"beats" | "inbound">("beats");
+  const [beat, setBeat] = useState<string>("");
+  const [editing, setEditing] = useState<SignalProfile | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [tab, setTab] = useState<SignalStatus | "all">("pending_review");
-  // "any" is every box at once. "unsorted" is the box for signals that matched
-  // nothing anyone asked for — a real destination, not an absence.
-  const [box, setBox] = useState<string>("any");
+
+  const { data: profiles = [] } = useSignalProfiles();
+  // Default to the first beat rather than to nothing: an empty selection would
+  // show every beat's signals at once, which is the mixture we just separated.
+  const current = beat || profiles[0]?.id || "";
   const { data, isLoading } = useSignals(
     tab === "all" ? undefined : tab,
-    box === "any" ? undefined : box,
+    view === "inbound" ? "unsorted" : current || undefined,
   );
-  const { data: profiles = [] } = useSignalProfiles();
   const signals = data?.items ?? [];
+  const following = profiles.reduce((n, p) => n + p.pending, 0);
+
+  function openNew() {
+    setEditing(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(profile: SignalProfile) {
+    setEditing(profile);
+    setFormOpen(true);
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -307,14 +310,56 @@ export default function SignalsInboxPage() {
 
       <div className="flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
-          <p className="text-[11px] text-[var(--text-3)]">{t("signals.subtitle")}</p>
+          <div className="flex gap-1 border-b border-[var(--border)]">
+            {(
+              [
+                ["beats", "signals.view_beats", following],
+                ["inbound", "signals.view_inbound", null],
+              ] as const
+            ).map(([key, labelKey, count]) => (
+              <button
+                key={key}
+                onClick={() => setView(key)}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${
+                  view === key
+                    ? "border-[var(--accent)] text-[var(--text)]"
+                    : "border-transparent text-[var(--text-3)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                {t(labelKey)}
+                {count ? (
+                  <span className="ml-1.5 font-mono text-[10px] text-[var(--text-3)]">{count}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
 
-          <SignalProfiles selected={box} onSelect={setBox} />
-
-          {/* Selecting a beat shows what has been happening on it. The list of
-              cards below stays: the brief is the reading, the cards are the
-              record, and an editor needs to be able to get from one to the other. */}
-          {box !== "any" && box !== "unsorted" && <ProfileBrief profileId={box} />}
+          {view === "beats" ? (
+            <>
+              <BeatBar
+                selected={current}
+                onSelect={setBeat}
+                onNew={openNew}
+                onEdit={openEdit}
+              />
+              {formOpen && (
+                <ProfileForm editing={editing} onClose={() => setFormOpen(false)} />
+              )}
+              {profiles.length === 0 && !formOpen && (
+                <div className="rounded-xl border border-[var(--border-2)] bg-[var(--surface)] p-8 text-center">
+                  <p className="text-sm text-[var(--text-2)]">{t("signals.no_beats")}</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-3)]">
+                    {t("signals.no_beats_hint")}
+                  </p>
+                </div>
+              )}
+              {/* The brief is the reading; the cards below are the record. An
+                  editor needs to be able to get from one to the other. */}
+              {current && !formOpen && <ProfileBrief profileId={current} />}
+            </>
+          ) : (
+            <p className="text-[11px] text-[var(--text-3)]">{t("signals.inbound_hint")}</p>
+          )}
 
           <div className="flex gap-1">
             {TABS.map(({ key, labelKey }) => (
@@ -343,11 +388,7 @@ export default function SignalsInboxPage() {
 
           <div className="space-y-2">
             {signals.map((s) => (
-              <SignalRow
-                key={s.id}
-                signal={s}
-                profileName={profiles.find((p) => p.id === s.profile_id)?.name}
-              />
+              <SignalRow key={s.id} signal={s} />
             ))}
           </div>
         </div>

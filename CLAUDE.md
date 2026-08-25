@@ -591,6 +591,13 @@ that shortcut; every hard one the model got right.
 test suite sets it: once two profiles existed, a live model sat on the path of
 every ingest and the signals suite went from 5 seconds to 3 minutes.
 
+**The inbox splits at the top level, not by filter.** "ประเด็นที่เราตามอยู่" is
+the newsroom's own agenda; "ข่าวที่ไหลเข้ามาเอง" is what the radar pushed that
+matches no beat. They answer different questions and mixing them into one list of
+chips was confusing enough to be reported as a bug. Defining a beat is likewise
+a different act from browsing them, so it opens its own panel rather than sitting
+as a form at the end of the beat list.
+
 Clicking a profile opens a **brief**, not a narrower list: `GET
 /profiles/{id}/brief` returns a timeline assembled from the signals' own
 `top_events` (deduplicated by URL, undated events kept at the end rather than
