@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Radar, TrendingUp } from "lucide-react";
 
+import { ProfileBrief } from "@/components/investigation/ProfileBrief";
 import { SignalProfiles } from "@/components/investigation/SignalProfiles";
 import { Topbar } from "@/components/layout/Topbar";
 import { useT } from "@/lib/hooks/useT";
@@ -51,7 +52,15 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-function SignalRow({ signal }: { signal: ExternalSignal }) {
+function SignalRow({
+  signal,
+  profileName,
+}: {
+  signal: ExternalSignal;
+  /** Which box this landed in. Undefined means nobody asked for it, which is a
+   * real answer and reads differently from "we have not decided yet". */
+  profileName?: string;
+}) {
   const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -96,6 +105,15 @@ function SignalRow({ signal }: { signal: ExternalSignal }) {
                 {c}
               </span>
             ))}
+            <span
+              className={`text-[11px] px-1.5 py-0.5 rounded ${
+                profileName
+                  ? "bg-[var(--accent)]/15 text-[var(--accent)]"
+                  : "bg-[var(--surface-3)] text-[var(--text-3)]"
+              }`}
+            >
+              {profileName ?? t("signals.box_unsorted")}
+            </span>
             {signal.verdict && (
               <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-2)]">
                 {t(`signals.verdict_${signal.verdict}` as never)}
@@ -119,6 +137,13 @@ function SignalRow({ signal }: { signal: ExternalSignal }) {
 
       {open && (
         <div className="border-t border-[var(--border-2)] p-4 space-y-4">
+          {/* Why it landed here, in the words of whatever decided. An editor
+              cannot tell whether a profile is doing what they meant without it. */}
+          {signal.profile_reason && (
+            <p className="text-[11px] text-[var(--text-3)]">
+              {t("signals.filed_because")} {signal.profile_reason}
+            </p>
+          )}
           {p.summary && <p className="text-sm text-[var(--text-2)]">{p.summary}</p>}
 
           {(p.top_events ?? []).length > 0 && (
@@ -266,7 +291,14 @@ function SignalRow({ signal }: { signal: ExternalSignal }) {
 export default function SignalsInboxPage() {
   const t = useT();
   const [tab, setTab] = useState<SignalStatus | "all">("pending_review");
-  const { data, isLoading } = useSignals(tab === "all" ? undefined : tab);
+  // "any" is every box at once. "unsorted" is the box for signals that matched
+  // nothing anyone asked for — a real destination, not an absence.
+  const [box, setBox] = useState<string>("any");
+  const { data, isLoading } = useSignals(
+    tab === "all" ? undefined : tab,
+    box === "any" ? undefined : box,
+  );
+  const { data: profiles = [] } = useSignalProfiles();
   const signals = data?.items ?? [];
 
   return (
@@ -277,7 +309,12 @@ export default function SignalsInboxPage() {
         <div className="max-w-3xl mx-auto space-y-4">
           <p className="text-[11px] text-[var(--text-3)]">{t("signals.subtitle")}</p>
 
-          <SignalProfiles />
+          <SignalProfiles selected={box} onSelect={setBox} />
+
+          {/* Selecting a beat shows what has been happening on it. The list of
+              cards below stays: the brief is the reading, the cards are the
+              record, and an editor needs to be able to get from one to the other. */}
+          {box !== "any" && box !== "unsorted" && <ProfileBrief profileId={box} />}
 
           <div className="flex gap-1">
             {TABS.map(({ key, labelKey }) => (
@@ -306,7 +343,11 @@ export default function SignalsInboxPage() {
 
           <div className="space-y-2">
             {signals.map((s) => (
-              <SignalRow key={s.id} signal={s} />
+              <SignalRow
+                key={s.id}
+                signal={s}
+                profileName={profiles.find((p) => p.id === s.profile_id)?.name}
+              />
             ))}
           </div>
         </div>

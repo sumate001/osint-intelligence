@@ -30,6 +30,13 @@ export function createSignalProfile(data: SignalProfileInput) {
   return apiFetch<SignalProfile>("/api/v1/signals/profiles", { method: "POST", body: data });
 }
 
+export function updateSignalProfile(id: string, data: SignalProfileInput) {
+  return apiFetch<SignalProfile>(`/api/v1/signals/profiles/${id}`, {
+    method: "PATCH",
+    body: data,
+  });
+}
+
 export function deleteSignalProfile(id: string) {
   return apiFetch<void>(`/api/v1/signals/profiles/${id}`, { method: "DELETE" });
 }

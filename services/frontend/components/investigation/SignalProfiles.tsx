@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 
-import { useCreateSignalProfile, useDeleteSignalProfile, useSignalProfiles } from "@/lib/hooks/useSignals";
+import {
+  useCreateSignalProfile,
+  useDeleteSignalProfile,
+  useSignalProfiles,
+  useUpdateSignalProfile,
+} from "@/lib/hooks/useSignals";
 import { useT } from "@/lib/hooks/useT";
+import type { SignalProfile } from "@/lib/types/signals";
 
 /**
  * What this newsroom has said it is watching.
@@ -35,31 +41,57 @@ const CATEGORIES = [
   "บันเทิง/กีฬา",
 ];
 
-export function SignalProfiles() {
+export function SignalProfiles({
+  selected,
+  onSelect,
+}: {
+  /** The box the inbox is currently filtered to. */
+  selected: string;
+  onSelect: (box: string) => void;
+}) {
   const t = useT();
   const { data: profiles = [] } = useSignalProfiles();
   const create = useCreateSignalProfile();
+  const update = useUpdateSignalProfile();
   const remove = useDeleteSignalProfile();
 
   const [open, setOpen] = useState(false);
+  /** Which profile is being edited, or "new" for the blank one at the bottom. */
+  const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
 
   const canSave = name.trim().length > 0 && description.trim().length > 0;
+  const busy = create.isPending || update.isPending;
+
+  function reset() {
+    setEditing(null);
+    setName("");
+    setDescription("");
+    setCategories([]);
+  }
+
+  function edit(profile: SignalProfile) {
+    setEditing(profile.id);
+    setName(profile.name);
+    setDescription(profile.description);
+    setCategories(profile.categories);
+  }
 
   function save() {
     if (!canSave) return;
-    create.mutate(
-      { name: name.trim(), description: description.trim(), categories, active: true },
-      {
-        onSuccess: () => {
-          setName("");
-          setDescription("");
-          setCategories([]);
-        },
-      },
-    );
+    const data = {
+      name: name.trim(),
+      description: description.trim(),
+      categories,
+      active: true,
+    };
+    const run = editing && editing !== "new"
+      ? update.mutate({ id: editing, data })
+      : create.mutate(data, { onSuccess: reset });
+    if (editing && editing !== "new") reset();
+    return run;
   }
 
   return (
@@ -83,9 +115,16 @@ export function SignalProfiles() {
           {profiles.map((profile) => (
             <div
               key={profile.id}
-              className="flex items-start gap-3 rounded-lg bg-[var(--surface-2)] px-3 py-2"
+              className={`flex items-start gap-3 rounded-lg px-3 py-2 ${
+                selected === profile.id
+                  ? "bg-[var(--surface-3)] ring-1 ring-[var(--accent)]/40"
+                  : "bg-[var(--surface-2)]"
+              }`}
             >
-              <div className="min-w-0 flex-1">
+              {/* Two separate actions on one row, because they are two separate
+                  intentions: showing what is in a box, and changing what the box
+                  is for. */}
+              <button onClick={() => onSelect(profile.id)} className="min-w-0 flex-1 text-left">
                 <p className="text-sm text-[var(--text)]">{profile.name}</p>
                 <p className="mt-0.5 text-[11px] text-[var(--text-2)]">{profile.description}</p>
                 {profile.categories.length > 0 && (
@@ -93,10 +132,17 @@ export function SignalProfiles() {
                     {profile.categories.join(" · ")}
                   </p>
                 )}
-              </div>
-              <span className="shrink-0 font-mono text-[11px] text-[var(--text-3)]">
-                {profile.pending}
-              </span>
+                <p className="mt-1 text-[10px] text-[var(--text-3)]">
+                  {t("signals.profile_pending").replace("{n}", String(profile.pending))}
+                </p>
+              </button>
+              <button
+                onClick={() => (editing === profile.id ? reset() : edit(profile))}
+                title={t("signals.profile_edit")}
+                className="shrink-0 text-[var(--text-3)] hover:text-[var(--text)]"
+              >
+                <Pencil size={14} />
+              </button>
               <button
                 onClick={() => remove.mutate(profile.id)}
                 title={t("signals.profile_delete_hint")}
@@ -147,14 +193,28 @@ export function SignalProfiles() {
             </div>
             <p className="text-[10px] text-[var(--text-3)]">{t("signals.profile_categories_hint")}</p>
 
-            <button
-              onClick={save}
-              disabled={!canSave || create.isPending}
-              className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm text-white disabled:opacity-40"
-            >
-              <Plus size={14} />
-              {create.isPending ? t("common.saving") : t("signals.profile_add")}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={save}
+                disabled={!canSave || busy}
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm text-white disabled:opacity-40"
+              >
+                <Plus size={14} />
+                {busy
+                  ? t("common.saving")
+                  : editing && editing !== "new"
+                    ? t("signals.profile_save")
+                    : t("signals.profile_add")}
+              </button>
+              {editing && editing !== "new" && (
+                <button
+                  onClick={reset}
+                  className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-3)] hover:text-[var(--text)]"
+                >
+                  {t("common.cancel")}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -39,6 +39,12 @@ export interface ExternalSignal {
   verdict: SignalVerdict | null;
   analyst_note: string | null;
   callback_status: CallbackStatus | null;
+  /** Which standing interest it landed in; null means nobody asked for it. */
+  profile_id: string | null;
+  /** Why it landed there, in the words of whatever decided — a category overlap
+   * or the model reading the profile description. Shown so an editor can see
+   * whether a profile is doing what they meant it to. */
+  profile_reason: string | null;
   received_at: string;
   closed_at: string | null;
 }

@@ -109,6 +109,36 @@ class SignalProfileOut(SignalProfileIn):
     pending: int = 0
 
 
+class BriefEvent(BaseModel):
+    """One dated thing that happened, lifted from a signal's own top_events."""
+
+    when: datetime | None
+    summary: str
+    source_name: str = ""
+    url: str = ""
+    signal_id: uuid.UUID
+
+
+class ProfileBrief(BaseModel):
+    """What has been happening on this beat.
+
+    A filtered list answers "what arrived"; an editor following a running story
+    needs "what happened, where, and what moved". The timeline is assembled from
+    the signals themselves and is therefore checkable; the reading is the model's
+    and is labelled as such.
+    """
+
+    profile: SignalProfileOut
+    signals_total: int
+    #: Newest first, deduplicated across signals — the same event reaches us
+    #: through several signals when a story keeps growing.
+    timeline: list[BriefEvent]
+    places: list[str]
+    #: The model's reading of the beat, or None when there is nothing to read.
+    developments: str | None = None
+    sources: list[str] = Field(default_factory=list)
+
+
 class SignalAccept(BaseModel):
     """Optional overrides when turning a signal into a case."""
 

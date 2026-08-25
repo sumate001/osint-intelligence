@@ -26,6 +26,7 @@ from .schemas import (
     SignalInboundAck,
     SignalListOut,
     SignalOut,
+    ProfileBrief,
     SignalProfileIn,
     SignalProfileOut,
 )
@@ -158,6 +159,29 @@ async def update_profile(
     await service.update_profile(db, profile, data)
     await db.commit()
     return SignalProfileOut(**data.model_dump(), id=profile.id, pending=0)
+
+
+@router.get("/profiles/{profile_id}/brief", response_model=ProfileBrief)
+async def profile_brief(
+    profile_id: uuid.UUID, db=Depends(get_db), _: dict = Depends(get_current_user)
+):
+    """What has been happening on this beat.
+
+    A filtered list answers "what arrived". Someone following a running story
+    needs "what happened, where, and what moved" — and the timeline half of that
+    is assembled from the signals themselves, so it can be checked against them.
+    """
+    profile = await service.get_profile(db, profile_id)
+    if profile is None:
+        raise HTTPException(404, "ไม่พบโปรไฟล์นี้")
+    brief = await service.profile_brief(db, profile)
+    return ProfileBrief(
+        **{**brief, "profile": SignalProfileOut(
+            **SignalProfileIn.model_validate(profile, from_attributes=True).model_dump(),
+            id=profile.id,
+            pending=0,
+        )}
+    )
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)

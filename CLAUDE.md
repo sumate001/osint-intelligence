@@ -581,6 +581,13 @@ which used to report back that the detection had been wrong.
 profiles existed, a live model sat on the path of every ingest and the signals
 suite went from 5 seconds to 3 minutes.
 
+Clicking a profile opens a **brief**, not a narrower list: `GET
+/profiles/{id}/brief` returns a timeline assembled from the signals' own
+`top_events` (deduplicated by URL, undated events kept at the end rather than
+dropped), plus the model's reading of where the beat is moving. The two are
+separate fields and separate blocks in the UI on purpose — the timeline can be
+checked against the cards below it, the reading cannot.
+
 Deleting a profile is `ON DELETE SET NULL` — signals filed under it fall back to
 the unsorted box. Retiring a beat must not destroy the leads collected under it.
 

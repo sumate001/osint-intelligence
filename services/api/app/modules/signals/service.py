@@ -243,6 +243,112 @@ async def delete_profile(db: AsyncSession, profile: SignalProfile) -> None:
     await db.flush()
 
 
+# ── what has been happening on a beat ────────────────────────────────────────
+
+BRIEF_SYSTEM = """คุณคือบรรณาธิการที่สรุปความคืบหน้าของประเด็นที่กองบรรณาธิการติดตามอยู่
+
+เขียนให้คนที่ตามเรื่องนี้อยู่แล้วอ่าน ไม่ใช่คนที่เพิ่งรู้จัก — บอกว่า *อะไรขยับ*
+ไม่ใช่เล่าซ้ำว่าเกิดอะไรขึ้นบ้าง ถ้าหลายข่าวเป็นเรื่องเดียวกันให้รวบเป็นเส้นเดียว
+ถ้าข้อมูลยังน้อยเกินกว่าจะบอกทิศทางได้ ให้พูดตรง ๆ ว่ายังบอกไม่ได้ — อย่าเดา
+
+ตอบ JSON เดียวเท่านั้น:
+{"places": ["ชื่อสถานที่ที่เป็นศูนย์กลางของเรื่อง"],
+ "developments": "สรุป 2-4 ประโยคภาษาไทยว่าประเด็นนี้ขยับไปทางไหน"}"""
+
+
+def _timeline_from(signals: list[ExternalSignal]) -> list[dict]:
+    """Every dated event these signals carry, newest first, deduplicated.
+
+    A story that keeps growing reaches us through several signals carrying
+    overlapping `top_events`, so the same happening would otherwise appear three
+    times on one timeline. The URL is the identity where there is one — two
+    outlets describing the same event in different words are two reports, and an
+    editor wants to see both.
+    """
+    seen: set[str] = set()
+    events: list[dict] = []
+    for signal in signals:
+        for event in (signal.payload or {}).get("top_events") or []:
+            key = event.get("url") or event.get("summary", "")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            events.append(
+                {
+                    "when": event.get("event_time"),
+                    "summary": event.get("summary", ""),
+                    "source_name": event.get("source_name", ""),
+                    "url": event.get("url", ""),
+                    "signal_id": signal.id,
+                }
+            )
+    # Undated events sort last rather than being dropped: "we do not know when"
+    # is not the same as "it did not happen".
+    return sorted(events, key=lambda e: (e["when"] is not None, e["when"] or ""), reverse=True)
+
+
+async def profile_brief(db: AsyncSession, profile: SignalProfile) -> dict:
+    """Assemble the beat: its timeline, its places, and how it is moving.
+
+    The timeline is built from the signals and is checkable against them. Only
+    the reading is the model's, and it is returned separately so the interface
+    can say which is which.
+    """
+    signals = list(
+        (
+            await db.execute(
+                select(ExternalSignal)
+                .where(ExternalSignal.profile_id == profile.id)
+                .order_by(ExternalSignal.received_at.desc())
+                .limit(60)
+            )
+        ).scalars()
+    )
+    timeline = _timeline_from(signals)
+    sources = sorted({e["source_name"] for e in timeline if e["source_name"]})
+
+    brief = {
+        "profile": profile,
+        "signals_total": len(signals),
+        "timeline": timeline[:40],
+        "places": [],
+        "developments": None,
+        "sources": sources,
+    }
+    if not signals or not get_settings().signal_profile_matching:
+        return brief
+
+    listing = "\n".join(
+        f"- {s.title} — {(s.payload or {}).get('summary', '')}" for s in signals[:25]
+    )
+    try:
+        from ..admin.service import get_effective_model
+
+        answer = await chat_json(
+            [
+                {"role": "system", "content": BRIEF_SYSTEM},
+                {
+                    "role": "user",
+                    "content": (
+                        f"ประเด็นที่ติดตาม: {profile.name}\n"
+                        f"นิยามของประเด็นนี้: {profile.description}\n\n"
+                        f"ข่าวที่เข้ามาในกล่องนี้ (ใหม่ไปเก่า):\n{listing}"
+                    ),
+                },
+            ],
+            module="signals",
+            model=await get_effective_model("signals"),
+        )
+    except Exception as exc:  # noqa: BLE001 — the timeline is worth showing alone
+        log.warning("profile brief failed", extra={"error": str(exc)})
+        return brief
+
+    places = answer.get("places")
+    brief["places"] = [str(p) for p in places][:12] if isinstance(places, list) else []
+    brief["developments"] = str(answer.get("developments") or "") or None
+    return brief
+
+
 async def pending_count(db: AsyncSession) -> int:
     return (
         await db.scalar(

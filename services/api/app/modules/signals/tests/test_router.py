@@ -381,3 +381,70 @@ async def test_deleting_a_profile_does_not_delete_what_was_filed_under_it(db):
 
     assert signal.profile_id is None
     assert await service.get(db, signal.id) is not None
+
+
+async def test_a_timeline_is_built_from_the_signals_not_from_the_model(db):
+    """The half of a brief that can be checked.
+
+    The reading underneath a brief is the model's and is labelled as such; the
+    timeline is assembled from the signals' own `top_events`, so an editor can
+    hold it against the cards below. That is why they are separate fields.
+    """
+    from app.modules.signals.schemas import SignalProfileIn
+
+    profile = await service.create_profile(
+        db, SignalProfileIn(name="พลังงาน", description="ไฟฟ้า", categories=["พลังงาน"])
+    )
+    await service.ingest(db, SignalInbound(**body()))
+    await db.commit()
+
+    brief = await service.profile_brief(db, profile)
+
+    assert brief["signals_total"] == 1
+    assert [e["summary"] for e in brief["timeline"]] == ["โรงไฟฟ้าหยุดเดินเครื่องฉุกเฉิน"]
+    assert brief["sources"] == ["Thai PBS"]
+
+
+async def test_the_same_event_reaching_us_twice_appears_once(db):
+    """A story that keeps growing arrives through several signals carrying
+    overlapping `top_events`, and one happening on a timeline three times reads
+    as three happenings."""
+    from app.modules.signals.schemas import SignalProfileIn
+
+    profile = await service.create_profile(
+        db, SignalProfileIn(name="พลังงาน", description="ไฟฟ้า", categories=["พลังงาน"])
+    )
+    await service.ingest(db, SignalInbound(**body()))
+    await service.ingest(db, SignalInbound(**body()))  # different signal, same event
+    await db.commit()
+
+    brief = await service.profile_brief(db, profile)
+
+    assert brief["signals_total"] == 2
+    assert len(brief["timeline"]) == 1
+
+
+async def test_an_undated_event_is_kept_at_the_end_rather_than_dropped(db):
+    """"We do not know when" is not the same as "it did not happen"."""
+    from app.modules.signals.schemas import SignalProfileIn
+
+    profile = await service.create_profile(
+        db, SignalProfileIn(name="พลังงาน", description="ไฟฟ้า", categories=["พลังงาน"])
+    )
+    payload = body()
+    payload["top_events"] = [
+        {
+            "summary": "ไม่ทราบวันเวลา",
+            "url": "https://example.com/undated",
+            "source_name": "X",
+            "credibility_weight": 0.5,
+            "event_time": None,
+        },
+        payload["top_events"][0],
+    ]
+    await service.ingest(db, SignalInbound(**payload))
+    await db.commit()
+
+    brief = await service.profile_brief(db, profile)
+
+    assert [e["summary"] for e in brief["timeline"]][-1] == "ไม่ทราบวันเวลา"

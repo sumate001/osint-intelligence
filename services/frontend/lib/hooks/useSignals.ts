@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import * as api from "../api/signals";
-import type { SignalVerdict } from "../types/signals";
+import type { SignalProfileInput, SignalVerdict } from "../types/signals";
 
 export function useSignals(status?: string, profile?: string) {
   return useQuery({
@@ -83,6 +83,18 @@ export function useCreateSignalProfile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: api.createSignalProfile,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["signal-profiles"] });
+      qc.invalidateQueries({ queryKey: ["signals"] });
+    },
+  });
+}
+
+export function useUpdateSignalProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SignalProfileInput }) =>
+      api.updateSignalProfile(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["signal-profiles"] });
       qc.invalidateQueries({ queryKey: ["signals"] });
