@@ -307,3 +307,77 @@ async def test_a_case_still_opens_when_horizon_is_down(db, monkeypatch):
 
     assert signal.status == "accepted"
     assert signal.investigation_case_id == case.id
+
+
+# ── profiles: what this newsroom is watching ─────────────────────────────────
+
+
+async def test_a_signal_matching_no_profile_lands_in_its_own_box(db):
+    """Unfiled is a destination, not a failure.
+
+    It means the engine surfaced something nobody asked for, and that is worth
+    seeing on its own — the alternative is a forced home, which is how an inbox
+    stops being read.
+    """
+    from app.modules.signals.schemas import SignalProfileIn
+
+    # Categories deliberately do not overlap, so this exercises the fall-through
+    # without needing the model: no category match and no model answer both mean
+    # "nobody asked for this", and that is the behaviour being pinned.
+    await service.create_profile(
+        db,
+        SignalProfileIn(
+            name="ความมั่นคงชายแดนใต้",
+            description="เหตุรุนแรงในสามจังหวัด",
+            categories=["ความมั่นคง"],
+        ),
+    )
+    payload = body()
+    payload["categories"] = ["บันเทิง/กีฬา"]
+    payload["title"] = "ผลฟุตบอลนัดชิงชนะเลิศ"
+    signal, _ = await service.ingest(db, SignalInbound(**payload))
+    await db.commit()
+
+    assert signal.profile_id is None
+
+    unsorted, total = await service.list_signals(db, profile=service.UNSORTED)
+    assert signal.id in {s.id for s in unsorted}
+    assert total >= 1
+
+
+async def test_a_category_match_files_the_signal_without_asking_the_model(db):
+    """Horizon's labels are already agreed between the two systems, so an overlap
+    is free and deterministic. Only the rest is worth a model call."""
+    from app.modules.signals.schemas import SignalProfileIn
+
+    profile = await service.create_profile(
+        db,
+        SignalProfileIn(
+            name="พลังงาน", description="ไฟฟ้า น้ำมัน ก๊าซ", categories=["พลังงาน"]
+        ),
+    )
+    signal, _ = await service.ingest(db, SignalInbound(**body()))
+    await db.commit()
+
+    assert signal.profile_id == profile.id
+    assert "พลังงาน" in (signal.profile_reason or "")
+
+
+async def test_deleting_a_profile_does_not_delete_what_was_filed_under_it(db):
+    """The FK is ON DELETE SET NULL for this reason: an editor retiring a beat
+    must not silently destroy the leads collected under it."""
+    from app.modules.signals.schemas import SignalProfileIn
+
+    profile = await service.create_profile(
+        db, SignalProfileIn(name="พลังงาน", description="ไฟฟ้า", categories=["พลังงาน"])
+    )
+    signal, _ = await service.ingest(db, SignalInbound(**body()))
+    await db.commit()
+    assert signal.profile_id == profile.id
+
+    await service.delete_profile(db, profile)
+    await db.commit()
+    await db.refresh(signal)
+
+    assert signal.profile_id is None
+    assert await service.get(db, signal.id) is not None

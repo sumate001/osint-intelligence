@@ -51,3 +51,21 @@ export interface SignalListOut {
 export interface SignalCountOut {
   pending_review: number;
 }
+
+
+/** A standing statement of what this newsroom follows. Matching happens on the
+ * DESK side on purpose: editorial priorities change weekly and belong here, not
+ * in the engine that finds the stories. */
+export type SignalProfileInput = {
+  name: string;
+  description: string;
+  /** Horizon's own labels. An overlap decides on its own, with no model call. */
+  categories: string[];
+  active: boolean;
+};
+
+export type SignalProfile = SignalProfileInput & {
+  id: string;
+  /** Signals sitting in this box awaiting review. */
+  pending: number;
+};

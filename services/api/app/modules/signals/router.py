@@ -26,6 +26,8 @@ from .schemas import (
     SignalInboundAck,
     SignalListOut,
     SignalOut,
+    SignalProfileIn,
+    SignalProfileOut,
 )
 from .tasks import send_verdict
 
@@ -108,13 +110,66 @@ async def feed_counts(_: dict = Depends(get_current_user)):
 @router.get("", response_model=SignalListOut)
 async def list_signals(
     status: str | None = Query(None),
+    profile: str | None = Query(
+        None, description='profile id, or "unsorted" for signals that matched none'
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db=Depends(get_db),
     _: dict = Depends(get_current_user),
 ):
-    items, total = await service.list_signals(db, status=status, page=page, page_size=page_size)
+    items, total = await service.list_signals(
+        db, status=status, profile=profile, page=page, page_size=page_size
+    )
     return SignalListOut(items=items, total=total)
+
+
+# ── profiles: what this newsroom is watching ─────────────────────────────────
+
+
+@router.get("/profiles", response_model=list[SignalProfileOut])
+async def list_profiles(db=Depends(get_db), _: dict = Depends(get_current_user)):
+    return [
+        SignalProfileOut(**SignalProfileIn.model_validate(p, from_attributes=True).model_dump(),
+                         id=p.id, pending=pending)
+        for p, pending in await service.list_profiles(db)
+    ]
+
+
+@router.post("/profiles", response_model=SignalProfileOut, status_code=201)
+async def create_profile(
+    data: SignalProfileIn, db=Depends(get_db), _: dict = Depends(get_current_user)
+):
+    profile = await service.create_profile(db, data)
+    await db.commit()
+    return SignalProfileOut(**data.model_dump(), id=profile.id, pending=0)
+
+
+@router.patch("/profiles/{profile_id}", response_model=SignalProfileOut)
+async def update_profile(
+    profile_id: uuid.UUID,
+    data: SignalProfileIn,
+    db=Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    profile = await service.get_profile(db, profile_id)
+    if profile is None:
+        raise HTTPException(404, "ไม่พบโปรไฟล์นี้")
+    await service.update_profile(db, profile, data)
+    await db.commit()
+    return SignalProfileOut(**data.model_dump(), id=profile.id, pending=0)
+
+
+@router.delete("/profiles/{profile_id}", status_code=204)
+async def delete_profile(
+    profile_id: uuid.UUID, db=Depends(get_db), _: dict = Depends(get_current_user)
+):
+    """Signals filed under it move to the unsorted box; nothing is deleted with it."""
+    profile = await service.get_profile(db, profile_id)
+    if profile is None:
+        raise HTTPException(404, "ไม่พบโปรไฟล์นี้")
+    await service.delete_profile(db, profile)
+    await db.commit()
 
 
 @router.get("/count", response_model=SignalCountOut)

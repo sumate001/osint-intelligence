@@ -555,6 +555,35 @@ external_signals(
 ## UI Additions (Investigation module)
 
 1. **Signals inbox** — new list view under Investigation: incoming signals with `pending_review` status. Columns: type badge (weak_signal / trend_breakout), title, scores, categories, received time. Row expands to show summary, top_events (with links), and force_assessments.
+## Signal profiles — what this newsroom is watching
+
+Horizon pushes every signal its detectors surface. It has no idea what any
+particular newsroom covers, and it should not: editorial priorities change weekly
+and belong on this side of a deliberately loose integration.
+
+Without somewhere to say so, the inbox mixed the story an editor was waiting for
+with a football final, and the only way to clear the football was to dismiss it —
+which used to report back that the detection had been wrong.
+
+`signal_profiles(name, description, categories[], active)`, matched in
+`signals/service.py:match_profile` at intake:
+
+1. **Category overlap** decides on its own. Horizon's labels are already agreed
+   between the systems, so this is free and deterministic.
+2. **Otherwise the model reads the description.** A subject is not a category: a
+   clash in Narathiwat arrived labelled `ต่างประเทศ` and reached the southern
+   security profile only because someone had written what that profile is for.
+3. **No match is a real answer** — `profile_id` NULL has its own box. It means
+   the engine surfaced something nobody asked for, which is worth seeing rather
+   than filed somewhere convenient.
+
+`SIGNAL_PROFILE_MATCHING=false` skips step 2. The test suite sets it: once two
+profiles existed, a live model sat on the path of every ingest and the signals
+suite went from 5 seconds to 3 minutes.
+
+Deleting a profile is `ON DELETE SET NULL` — signals filed under it fall back to
+the unsorted box. Retiring a beat must not destroy the leads collected under it.
+
 **`off_topic` is not a fourth grade of wrongness.** It says the detection was
 correct and the story is simply not on this newsroom's beat — feedback about
 relevance, not accuracy. Horizon's `verdicts` table is the corpus it tunes

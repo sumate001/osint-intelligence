@@ -3,16 +3,35 @@ import type {
   ExternalSignal,
   SignalCountOut,
   SignalListOut,
+  SignalProfile,
+  SignalProfileInput,
   SignalVerdict,
 } from "../types/signals";
 import type { Case } from "../types/investigation";
 
 export function getSignals(params?: {
   status?: string;
+  /** A profile id, or "unsorted" for the signals that matched none of them. */
+  profile?: string;
   page?: number;
   page_size?: number;
 }) {
   return apiFetch<SignalListOut>("/api/v1/signals", { params });
+}
+
+/** What this newsroom has said it is watching, with how much is waiting in each.
+ * Horizon pushes everything its detectors surface — it has no idea what any
+ * particular newsroom covers, and should not. This is where that is decided. */
+export function getSignalProfiles() {
+  return apiFetch<SignalProfile[]>("/api/v1/signals/profiles");
+}
+
+export function createSignalProfile(data: SignalProfileInput) {
+  return apiFetch<SignalProfile>("/api/v1/signals/profiles", { method: "POST", body: data });
+}
+
+export function deleteSignalProfile(id: string) {
+  return apiFetch<void>(`/api/v1/signals/profiles/${id}`, { method: "DELETE" });
 }
 
 export function getSignalCount() {

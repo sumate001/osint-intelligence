@@ -16,7 +16,9 @@ from . import horizon_client as horizon
 from ..investigation import service as investigation
 from ..knowledge import service as knowledge
 from ..investigation.schemas import CaseCreate, EvidenceCreate
-from .models import ExternalSignal
+from ...core.config import get_settings
+from ...core.llm import chat_json
+from .models import ExternalSignal, SignalProfile
 from .schemas import SignalAccept, SignalClose, SignalDismiss, SignalInbound
 
 log = logging.getLogger(__name__)
@@ -36,6 +38,83 @@ async def get_by_signal_id(db: AsyncSession, signal_id: uuid.UUID) -> ExternalSi
 
 async def get(db: AsyncSession, external_id: uuid.UUID) -> ExternalSignal | None:
     return await db.get(ExternalSignal, external_id)
+
+
+# ── which box does this belong in ────────────────────────────────────────────
+
+PROFILE_SYSTEM = """คุณคือบรรณาธิการข่าวที่คัดว่าข่าวชิ้นนี้เข้าประเด็นที่กองบรรณาธิการติดตามหรือไม่
+
+ตอบเฉพาะโปรไฟล์ที่ข่าวนี้ "เข้าประเด็นจริง ๆ" เท่านั้น
+ข่าวส่วนใหญ่จะไม่เข้าโปรไฟล์ไหนเลย ซึ่งเป็นคำตอบที่ถูกต้องและพบบ่อยที่สุด
+การไม่จัดเข้าโปรไฟล์ดีกว่าจัดผิด เพราะกล่องที่เต็มไปด้วยของไม่เกี่ยวคือกล่องที่คนเลิกเปิด
+
+ตอบ JSON เดียวเท่านั้น:
+{"profile": เลขลำดับ หรือ null, "reason": "เหตุผลสั้น ๆ ภาษาไทย"}"""
+
+
+async def match_profile(
+    db: AsyncSession, signal: ExternalSignal
+) -> tuple[uuid.UUID | None, str | None]:
+    """Which standing interest this signal belongs to, if any.
+
+    Category overlap decides on its own when it happens — Horizon's labels are
+    cheap and already agreed between the two systems. Everything else goes to the
+    model, because "เหตุการณ์ไม่สงบในภาคใต้" is a subject, and no category list
+    captures a subject.
+
+    Returns `(None, None)` when nothing fits, and that is the common answer. A
+    signal with no profile is not an error: it is the engine surfacing something
+    nobody asked for, which is worth its own box rather than a forced home.
+    """
+    profiles = (
+        await db.execute(select(SignalProfile).where(SignalProfile.active.is_(True)))
+    ).scalars().all()
+    if not profiles:
+        return None, None
+
+    categories = set((signal.payload or {}).get("categories") or [])
+    for profile in profiles:
+        shared = categories & set(profile.categories or [])
+        if shared:
+            return profile.id, f"หมวดตรงกัน: {', '.join(sorted(shared))}"
+
+    if not get_settings().signal_profile_matching:
+        return None, None
+
+    listing = "\n".join(
+        f"{i}. {p.name} — {p.description or '(ไม่มีคำอธิบาย)'}"
+        for i, p in enumerate(profiles)
+    )
+    payload = signal.payload or {}
+    try:
+        from ..admin.service import get_effective_model
+
+        answer = await chat_json(
+            [
+                {"role": "system", "content": PROFILE_SYSTEM},
+                {
+                    "role": "user",
+                    "content": (
+                        f"หัวข้อข่าว: {signal.title}\n"
+                        f"สรุป: {payload.get('summary', '')}\n"
+                        f"หมวดที่ระบบให้: {', '.join(categories) or '(ไม่มี)'}\n\n"
+                        f"โปรไฟล์ที่กองบรรณาธิการติดตาม:\n{listing}"
+                    ),
+                },
+            ],
+            module="signals",
+            model=await get_effective_model("signals"),
+        )
+    except Exception as exc:  # noqa: BLE001 — intake must never fail on this
+        # Unfiled beats unfiled-and-lost: the signal is still stored and still
+        # visible, it just lands in the unsorted box until someone moves it.
+        log.warning("profile matching failed", extra={"error": str(exc)})
+        return None, None
+
+    index = answer.get("profile")
+    if not isinstance(index, int) or not 0 <= index < len(profiles):
+        return None, str(answer.get("reason") or "") or None
+    return profiles[index].id, str(answer.get("reason") or "")[:300] or None
 
 
 async def ingest(db: AsyncSession, data: SignalInbound) -> tuple[ExternalSignal, bool]:
@@ -64,25 +143,44 @@ async def ingest(db: AsyncSession, data: SignalInbound) -> tuple[ExternalSignal,
     )
     db.add(signal)
     await db.flush()
+    signal.profile_id, signal.profile_reason = await match_profile(db, signal)
     log.info(
         "signal received",
         extra={
             "signal_id": str(data.signal_id),
             "osint_signal_id": str(signal.id),
             "signal_type": data.signal_type,
+            "profile_id": str(signal.profile_id) if signal.profile_id else None,
         },
     )
     return signal, True
 
 
+#: `?profile=unsorted` asks for the signals that matched nothing. It needs its
+#: own word because SQL cannot express "IS NULL" through a uuid query parameter,
+#: and because that box is a real destination rather than an absence.
+UNSORTED = "unsorted"
+
+
 async def list_signals(
-    db: AsyncSession, *, status: str | None = None, page: int = 1, page_size: int = 20
+    db: AsyncSession,
+    *,
+    status: str | None = None,
+    profile: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
 ) -> tuple[list[ExternalSignal], int]:
     query = select(ExternalSignal)
     count_query = select(func.count()).select_from(ExternalSignal)
     if status:
         query = query.where(ExternalSignal.status == status)
         count_query = count_query.where(ExternalSignal.status == status)
+    if profile == UNSORTED:
+        clause = ExternalSignal.profile_id.is_(None)
+        query, count_query = query.where(clause), count_query.where(clause)
+    elif profile:
+        clause = ExternalSignal.profile_id == uuid.UUID(profile)
+        query, count_query = query.where(clause), count_query.where(clause)
 
     total = await db.scalar(count_query) or 0
     rows = (
@@ -93,6 +191,56 @@ async def list_signals(
         )
     ).scalars()
     return list(rows), total
+
+
+async def list_profiles(db: AsyncSession) -> list[tuple[SignalProfile, int]]:
+    """Every profile with how much is waiting in it.
+
+    The count is the whole reason an editor opens this page: a profile with
+    nothing in it for a week is either wrong or the story has not happened yet,
+    and only they can tell which.
+    """
+    profiles = (
+        await db.execute(select(SignalProfile).order_by(SignalProfile.created_at))
+    ).scalars().all()
+    counts = dict(
+        (
+            await db.execute(
+                select(ExternalSignal.profile_id, func.count())
+                .where(ExternalSignal.status == "pending_review")
+                .group_by(ExternalSignal.profile_id)
+            )
+        ).all()
+    )
+    return [(p, counts.get(p.id, 0)) for p in profiles]
+
+
+async def create_profile(db: AsyncSession, data) -> SignalProfile:
+    profile = SignalProfile(**data.model_dump())
+    db.add(profile)
+    await db.flush()
+    log.info("signal profile created", extra={"profile": profile.name})
+    return profile
+
+
+async def update_profile(db: AsyncSession, profile: SignalProfile, data) -> SignalProfile:
+    for field, value in data.model_dump().items():
+        setattr(profile, field, value)
+    await db.flush()
+    return profile
+
+
+async def get_profile(db: AsyncSession, profile_id: uuid.UUID) -> SignalProfile | None:
+    return (
+        await db.execute(select(SignalProfile).where(SignalProfile.id == profile_id))
+    ).scalar_one_or_none()
+
+
+async def delete_profile(db: AsyncSession, profile: SignalProfile) -> None:
+    """Signals filed under it fall back to the unsorted box rather than vanishing
+    — the FK is ON DELETE SET NULL for that reason."""
+    await db.delete(profile)
+    await db.flush()
 
 
 async def pending_count(db: AsyncSession) -> int:

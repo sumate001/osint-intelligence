@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Radar, TrendingUp } from "lucide-react";
 
+import { SignalProfiles } from "@/components/investigation/SignalProfiles";
 import { Topbar } from "@/components/layout/Topbar";
 import { useT } from "@/lib/hooks/useT";
 import {
   useAcceptSignal,
   useDismissSignal,
+  useSignalProfiles,
   useSignals,
 } from "@/lib/hooks/useSignals";
 import type { DismissKind } from "@/lib/api/signals";
@@ -274,6 +276,8 @@ export default function SignalsInboxPage() {
       <div className="flex-1 overflow-y-auto p-5">
         <div className="max-w-3xl mx-auto space-y-4">
           <p className="text-[11px] text-[var(--text-3)]">{t("signals.subtitle")}</p>
+
+          <SignalProfiles />
 
           <div className="flex gap-1">
             {TABS.map(({ key, labelKey }) => (

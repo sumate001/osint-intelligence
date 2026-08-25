@@ -6,6 +6,11 @@ class Settings(BaseSettings):
     # App
     app_name: str = "OSINT//DESK API"
     debug: bool = False
+    #: Whether an inbound signal with no category match is put to the model to
+    #: decide which standing interest it belongs to. On in production; the test
+    #: suite turns it off so a live model is not on the path of every ingest —
+    #: with two profiles defined that took the signals suite from 5s to 3 minutes.
+    signal_profile_matching: bool = True
 
     # Database
     postgres_url: str = "postgresql+asyncpg://osint:changeme@localhost:5432/osintdesk"

@@ -13,6 +13,12 @@ the stack is using.
 
 import os
 
+# A live model must not sit on the path of every ingest. Once two profiles were
+# defined, a signal with no category match asked the model which box it belonged
+# in — correct in production, and it took this suite from five seconds to three
+# minutes. Tests that care about that decision turn it back on themselves.
+os.environ.setdefault("SIGNAL_PROFILE_MATCHING", "false")
+
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine

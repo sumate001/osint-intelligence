@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "../api/signals";
 import type { SignalVerdict } from "../types/signals";
 
-export function useSignals(status?: string) {
+export function useSignals(status?: string, profile?: string) {
   return useQuery({
-    queryKey: ["signals", status ?? "all"],
-    queryFn: () => api.getSignals(status ? { status } : undefined),
+    queryKey: ["signals", status ?? "all", profile ?? "any"],
+    queryFn: () =>
+      api.getSignals({ ...(status ? { status } : {}), ...(profile ? { profile } : {}) }),
     refetchInterval: 30_000,
   });
 }
@@ -67,4 +68,35 @@ export function useCloseSignal() {
     ({ id, verdict, note }: { id: string; verdict: SignalVerdict; note?: string }) =>
       api.closeSignal(id, verdict, note),
   );
+}
+
+
+export function useSignalProfiles() {
+  return useQuery({
+    queryKey: ["signal-profiles"],
+    queryFn: api.getSignalProfiles,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useCreateSignalProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createSignalProfile,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["signal-profiles"] });
+      qc.invalidateQueries({ queryKey: ["signals"] });
+    },
+  });
+}
+
+export function useDeleteSignalProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteSignalProfile,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["signal-profiles"] });
+      qc.invalidateQueries({ queryKey: ["signals"] });
+    },
+  });
 }

@@ -70,6 +70,10 @@ class SignalOut(BaseModel):
     verdict: str | None
     analyst_note: str | None
     callback_status: str | None
+    #: Which standing interest this landed in. None is a real answer with its own
+    #: box: the engine surfaced something nobody asked for.
+    profile_id: uuid.UUID | None = None
+    profile_reason: str | None = None
     received_at: datetime
     closed_at: datetime | None
 
@@ -83,6 +87,26 @@ class SignalCountOut(BaseModel):
     """Badge counter for the inbox — the notification mechanism the spec asks for."""
 
     pending_review: int
+
+
+class SignalProfileIn(BaseModel):
+    """A standing statement of what this newsroom follows."""
+
+    name: str = Field(min_length=1, max_length=120)
+    #: Read by the model when categories cannot decide. "เหตุการณ์ไม่สงบใน
+    #: ภาคใต้" is a subject, and no category list captures a subject.
+    description: str = ""
+    #: Horizon's own labels. An overlap decides on its own, without a model call.
+    categories: list[str] = Field(default_factory=list)
+    active: bool = True
+
+
+class SignalProfileOut(SignalProfileIn):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    #: Signals currently sitting in this box awaiting review.
+    pending: int = 0
 
 
 class SignalAccept(BaseModel):
