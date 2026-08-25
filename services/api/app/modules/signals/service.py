@@ -45,6 +45,8 @@ async def get(db: AsyncSession, external_id: uuid.UUID) -> ExternalSignal | None
 PROFILE_SYSTEM = """คุณคือบรรณาธิการข่าวที่คัดว่าข่าวชิ้นนี้เข้าประเด็นที่กองบรรณาธิการติดตามหรือไม่
 
 ตอบเฉพาะโปรไฟล์ที่ข่าวนี้ "เข้าประเด็นจริง ๆ" เท่านั้น
+ดูที่ *เนื้อเรื่อง* ไม่ใช่ที่หมวด — หมวดอย่าง "ความมั่นคง" ครอบทั้งเหตุไม่สงบชายแดนใต้
+ความมั่นคงไซเบอร์ และคดีบุกรุกที่ดิน การที่หมวดตรงไม่ได้แปลว่าเข้าประเด็น
 ข่าวส่วนใหญ่จะไม่เข้าโปรไฟล์ไหนเลย ซึ่งเป็นคำตอบที่ถูกต้องและพบบ่อยที่สุด
 การไม่จัดเข้าโปรไฟล์ดีกว่าจัดผิด เพราะกล่องที่เต็มไปด้วยของไม่เกี่ยวคือกล่องที่คนเลิกเปิด
 
@@ -57,10 +59,20 @@ async def match_profile(
 ) -> tuple[uuid.UUID | None, str | None]:
     """Which standing interest this signal belongs to, if any.
 
-    Category overlap decides on its own when it happens — Horizon's labels are
-    cheap and already agreed between the two systems. Everything else goes to the
-    model, because "เหตุการณ์ไม่สงบในภาคใต้" is a subject, and no category list
-    captures a subject.
+    **Horizon's categories do not gate this, in either direction.** They were
+    tried both ways and both were wrong for the same reason: the label is not
+    reliable enough to decide anything.
+
+    Filing on an overlap put a durian orchard being cleared near a reservoir into
+    a profile about insurgent violence, because "ความมั่นคง" covers the southern
+    insurgency, a cyber incident and a land dispute equally well. Excluding on a
+    non-overlap then dropped a clash between rangers and armed men in Narathiwat,
+    which had arrived labelled "ต่างประเทศ" — the very signal that had proved the
+    label could not be trusted.
+
+    So every active profile goes to the model and the description decides. The
+    categories are still shown, as one piece of context among the title and the
+    summary, which is all a label of that quality is worth.
 
     Returns `(None, None)` when nothing fits, and that is the common answer. A
     signal with no profile is not an error: it is the engine surfacing something
@@ -72,18 +84,15 @@ async def match_profile(
     if not profiles:
         return None, None
 
-    categories = set((signal.payload or {}).get("categories") or [])
-    for profile in profiles:
-        shared = categories & set(profile.categories or [])
-        if shared:
-            return profile.id, f"หมวดตรงกัน: {', '.join(sorted(shared))}"
-
     if not get_settings().signal_profile_matching:
         return None, None
 
+    categories = set((signal.payload or {}).get("categories") or [])
+    considered = list(profiles)
     listing = "\n".join(
         f"{i}. {p.name} — {p.description or '(ไม่มีคำอธิบาย)'}"
-        for i, p in enumerate(profiles)
+        + (f" [มักอยู่ในหมวด: {', '.join(p.categories)}]" if p.categories else "")
+        for i, p in enumerate(considered)
     )
     payload = signal.payload or {}
     try:
@@ -112,9 +121,9 @@ async def match_profile(
         return None, None
 
     index = answer.get("profile")
-    if not isinstance(index, int) or not 0 <= index < len(profiles):
+    if not isinstance(index, int) or not 0 <= index < len(considered):
         return None, str(answer.get("reason") or "") or None
-    return profiles[index].id, str(answer.get("reason") or "")[:300] or None
+    return considered[index].id, str(answer.get("reason") or "")[:300] or None
 
 
 async def ingest(db: AsyncSession, data: SignalInbound) -> tuple[ExternalSignal, bool]:

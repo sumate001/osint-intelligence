@@ -568,18 +568,28 @@ which used to report back that the detection had been wrong.
 `signal_profiles(name, description, categories[], active)`, matched in
 `signals/service.py:match_profile` at intake:
 
-1. **Category overlap** decides on its own. Horizon's labels are already agreed
-   between the systems, so this is free and deterministic.
-2. **Otherwise the model reads the description.** A subject is not a category: a
-   clash in Narathiwat arrived labelled `ต่างประเทศ` and reached the southern
-   security profile only because someone had written what that profile is for.
+1. **Categories narrow, they never decide.** A profile with categories set is
+   only considered for signals sharing one; a profile with none is considered
+   for everything. This kept the wrong thing out of the prompt, not the wrong
+   thing out of the box — see below.
+2. **The description decides**, read by the model. A subject is always narrower
+   than a category: a clash in Narathiwat arrived labelled `ต่างประเทศ` and
+   reached the southern security profile only because someone had written what
+   that profile is for.
 3. **No match is a real answer** — `profile_id` NULL has its own box. It means
    the engine surfaced something nobody asked for, which is worth seeing rather
    than filed somewhere convenient.
 
-`SIGNAL_PROFILE_MATCHING=false` skips step 2. The test suite sets it: once two
-profiles existed, a live model sat on the path of every ingest and the signals
-suite went from 5 seconds to 3 minutes.
+**A category overlap used to file the signal on its own.** It looked free and
+deterministic and it was wrong within a day: `ความมั่นคง` covers the southern
+insurgency, a cyber incident and a land-encroachment case equally well, so a
+durian orchard being cleared near a reservoir landed in a profile about insurgent
+violence — as did a leftover test row. Every mis-filed signal had come through
+that shortcut; every hard one the model got right.
+
+`SIGNAL_PROFILE_MATCHING=false` skips step 2, leaving everything unsorted. The
+test suite sets it: once two profiles existed, a live model sat on the path of
+every ingest and the signals suite went from 5 seconds to 3 minutes.
 
 Clicking a profile opens a **brief**, not a narrower list: `GET
 /profiles/{id}/brief` returns a timeline assembled from the signals' own

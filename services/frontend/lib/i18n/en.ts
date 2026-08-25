@@ -111,7 +111,7 @@ const en: TranslationKeys = {
     profile_name_placeholder: "Profile name, e.g. Southern border security",
     profile_question_placeholder: "What are you looking for? Write it as you would explain it to a colleague.",
     profile_question_hint: "This field does the work — a clash in Narathiwat arrived labelled ต่างประเทศ and landed correctly because of it",
-    profile_categories_hint: "Optional. A category match files the signal without asking the model.",
+    profile_categories_hint: "Optional. Narrows which signals this profile is considered for — it never decides. The description above decides. None set = considered for everything.",
     profile_add: "Add profile",
     profile_delete_hint: "Delete. Signals in this box move to the unsorted box; nothing is deleted with it.",
     profile_edit: "Edit profile",

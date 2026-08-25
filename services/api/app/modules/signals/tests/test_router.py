@@ -345,22 +345,67 @@ async def test_a_signal_matching_no_profile_lands_in_its_own_box(db):
     assert total >= 1
 
 
-async def test_a_category_match_files_the_signal_without_asking_the_model(db):
-    """Horizon's labels are already agreed between the two systems, so an overlap
-    is free and deterministic. Only the rest is worth a model call."""
+async def test_a_matching_category_is_not_enough_on_its_own(db):
+    """The bug an editor spotted immediately: foreign news in a profile about
+    the southern insurgency.
+
+    A category overlap used to file the signal by itself. "ความมั่นคง" turned
+    out to cover the insurgency, a cyber incident and a land-encroachment case
+    equally well, so a durian orchard being cleared near a reservoir landed in a
+    profile about insurgent violence. A profile's subject is always narrower than
+    any category, so the description decides and the category only narrows the
+    field.
+    """
     from app.modules.signals.schemas import SignalProfileIn
 
-    profile = await service.create_profile(
+    await service.create_profile(
         db,
         SignalProfileIn(
             name="พลังงาน", description="ไฟฟ้า น้ำมัน ก๊าซ", categories=["พลังงาน"]
         ),
     )
+    # Matching is off in the suite, so reaching the model is the only way in —
+    # which is exactly the point: a shared category alone must not file anything.
     signal, _ = await service.ingest(db, SignalInbound(**body()))
     await db.commit()
 
-    assert signal.profile_id == profile.id
-    assert "พลังงาน" in (signal.profile_reason or "")
+    assert signal.profile_id is None
+
+
+async def test_a_category_does_not_exclude_a_profile_either(db, monkeypatch):
+    """The correction to the correction.
+
+    Filing on a category overlap was wrong, so overlap became a filter — which
+    then dropped a clash between rangers and armed men in Narathiwat, because
+    Horizon had labelled it ต่างประเทศ. That was the very signal that proved the
+    label could not be trusted. A label too unreliable to include on is too
+    unreliable to exclude on, so it gates nothing and every profile is considered.
+    """
+    from app.modules.signals import service as signals_service
+    from app.modules.signals.schemas import SignalProfileIn
+
+    await service.create_profile(
+        db, SignalProfileIn(name="กีฬา", description="ฟุตบอล", categories=["บันเทิง/กีฬา"])
+    )
+    seen: dict = {}
+
+    async def spy(messages, **kwargs):
+        seen["prompt"] = "\n".join(m["content"] for m in messages)
+        return {"profile": None, "reason": "ไม่ใช่"}
+
+    monkeypatch.setattr(signals_service, "chat_json", spy)
+    monkeypatch.setattr(
+        signals_service.get_settings(), "signal_profile_matching", True, raising=False
+    )
+
+    payload = body()
+    payload["categories"] = ["พลังงาน"]  # shares nothing with the profile
+    signal, _ = await service.ingest(db, SignalInbound(**payload))
+    await db.commit()
+
+    # The profile must reach the model even though no category overlaps.
+    assert "กีฬา" in seen["prompt"]
+    assert signal.profile_id is None
 
 
 async def test_deleting_a_profile_does_not_delete_what_was_filed_under_it(db):
@@ -372,8 +417,8 @@ async def test_deleting_a_profile_does_not_delete_what_was_filed_under_it(db):
         db, SignalProfileIn(name="พลังงาน", description="ไฟฟ้า", categories=["พลังงาน"])
     )
     signal, _ = await service.ingest(db, SignalInbound(**body()))
+    signal.profile_id = profile.id  # filed by hand: the model is off in the suite
     await db.commit()
-    assert signal.profile_id == profile.id
 
     await service.delete_profile(db, profile)
     await db.commit()
@@ -395,7 +440,8 @@ async def test_a_timeline_is_built_from_the_signals_not_from_the_model(db):
     profile = await service.create_profile(
         db, SignalProfileIn(name="พลังงาน", description="ไฟฟ้า", categories=["พลังงาน"])
     )
-    await service.ingest(db, SignalInbound(**body()))
+    signal, _ = await service.ingest(db, SignalInbound(**body()))
+    signal.profile_id = profile.id  # filed by hand: the model is off in the suite
     await db.commit()
 
     brief = await service.profile_brief(db, profile)
@@ -414,8 +460,9 @@ async def test_the_same_event_reaching_us_twice_appears_once(db):
     profile = await service.create_profile(
         db, SignalProfileIn(name="พลังงาน", description="ไฟฟ้า", categories=["พลังงาน"])
     )
-    await service.ingest(db, SignalInbound(**body()))
-    await service.ingest(db, SignalInbound(**body()))  # different signal, same event
+    for _ in range(2):  # two signals carrying the same event
+        signal, _ = await service.ingest(db, SignalInbound(**body()))
+        signal.profile_id = profile.id
     await db.commit()
 
     brief = await service.profile_brief(db, profile)
@@ -442,7 +489,8 @@ async def test_an_undated_event_is_kept_at_the_end_rather_than_dropped(db):
         },
         payload["top_events"][0],
     ]
-    await service.ingest(db, SignalInbound(**payload))
+    signal, _ = await service.ingest(db, SignalInbound(**payload))
+    signal.profile_id = profile.id
     await db.commit()
 
     brief = await service.profile_brief(db, profile)
