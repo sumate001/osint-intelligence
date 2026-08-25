@@ -186,10 +186,10 @@ result = await chat_json(messages, module="module_name", model=effective_model)
 
 **Cross-source URL dedup**: `_ingest_source()` deduplicates by both `external_id` (within same source) AND `url` (across all sources). This prevents the same article from 15 different RSS feeds being stored 15 times.
 
-**Celery queue separation** — two workers, never mix:
-- `osint-worker` → `triage` queue — 8 concurrency, uses `gemma4:e4b`, handles feed ingestion + scoring
-- `osint-worker-intel` → `intel` queue — 4 concurrency, uses `gemma4:12b`, handles SpiderFoot scans + PIR matching
-- `investigation.run_spiderfoot_scan` task **must** declare `queue="intel"` — without it, task goes to default `celery` queue where no worker listens
+**Celery queues** — `intel` is the only one with a worker running:
+- `osint-worker-intel` → `intel` queue — 4 concurrency, uses `gemma4:12b`. SpiderFoot scans, PIR matching, verdict callbacks to Horizon, and UGC verification.
+- `osint-worker` → `triage` queue — still defined in `docker-compose.yml` but **not running**: feed ingestion moved to Horizon and this worker went with it. The only tasks still routed there are the retired ingestion ones (`triage.poll_all_sources`, `triage.ingest_source`, reachable from the admin "ingest now" action on a source).
+- **Anything a user waits on must go to `intel`.** `run_verify_pipeline` was still queued to `triage`; nothing had exercised it, so nothing had failed — the first analyst to upload media would have got a job that never ran, with no error and no failed status. Same failure as a task left on the default `celery` queue, which is why `investigation.run_spiderfoot_scan` must declare `queue="intel"` explicitly.
 
 ## Do Not Touch
 

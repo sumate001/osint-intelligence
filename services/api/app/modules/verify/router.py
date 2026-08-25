@@ -42,8 +42,13 @@ async def upload_for_verify(
     # Try to upload to MinIO (best-effort)
     await upload_to_minio(data, job.minio_key, content_type)
 
-    # Trigger async verification
-    run_verify_pipeline.apply_async((str(job.id),), queue="triage")
+    # `intel`, not `triage`. Feed ingestion moved to Horizon and the triage
+    # worker went with it, so a job queued there is a job nobody runs — and the
+    # analyst sees an upload that never finishes, with no error anywhere. `intel`
+    # is also where this belongs on its own merits: it is the slower queue that
+    # runs the 12b model, and verification is a vision-model job, not a
+    # lightweight scoring one.
+    run_verify_pipeline.apply_async((str(job.id),), queue="intel")
 
     return job
 
