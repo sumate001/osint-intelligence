@@ -276,9 +276,16 @@ async def accept(
 
 
 async def dismiss(db: AsyncSession, signal: ExternalSignal, data: SignalDismiss) -> ExternalSignal:
-    """Reject a signal outright. This is a false_signal as far as Horizon cares."""
+    """Reject a signal without opening a case, saying which kind of no it is.
+
+    The default is `off_topic`, because that is what most dismissals are: the
+    story is real and correctly detected, it is simply not something this
+    newsroom follows. Reporting those as `false_signal` — which is what this did
+    for every dismissal — feeds Horizon's threshold-tuning corpus with detection
+    errors that never happened.
+    """
     signal.status = "dismissed"
-    signal.verdict = "false_signal"
+    signal.verdict = data.verdict
     signal.analyst_note = data.reason
     signal.closed_at = _now()
     signal.callback_status = "pending"

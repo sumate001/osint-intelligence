@@ -522,7 +522,7 @@ Headers: `X-API-Key: {HORIZON_API_KEY}`
 {
   "signal_id": "uuid (from the original inbound payload)",
   "osint_signal_id": "string (external_signals.id)",
-  "verdict": "true_signal | false_signal | inconclusive",
+  "verdict": "true_signal | false_signal | inconclusive | off_topic",
   "analyst_note": "string|null",
   "closed_at": "ISO-8601"
 }
@@ -544,7 +544,7 @@ external_signals(
   payload JSONB,                  -- full original payload, verbatim
   status TEXT,                    -- pending_review | accepted | dismissed | closed
   investigation_case_id FK NULL,  -- linked case once accepted
-  verdict TEXT NULL,              -- true_signal | false_signal | inconclusive
+  verdict TEXT NULL,              -- true_signal | false_signal | inconclusive | off_topic
   analyst_note TEXT NULL,
   callback_status TEXT NULL,      -- pending | delivered | failed
   received_at TIMESTAMPTZ,
@@ -555,9 +555,17 @@ external_signals(
 ## UI Additions (Investigation module)
 
 1. **Signals inbox** — new list view under Investigation: incoming signals with `pending_review` status. Columns: type badge (weak_signal / trend_breakout), title, scores, categories, received time. Row expands to show summary, top_events (with links), and force_assessments.
+**`off_topic` is not a fourth grade of wrongness.** It says the detection was
+correct and the story is simply not on this newsroom's beat — feedback about
+relevance, not accuracy. Horizon's `verdicts` table is the corpus it tunes
+detection thresholds against, so this distinction is load-bearing: dismissal used
+to always send `false_signal`, which meant an editor clearing off-beat stories
+was training the radar to suppress the detections that were working. Nothing in
+either system would have shown it happening.
+
 2. **Accept / Dismiss actions**:
    - **Accept** → creates a new investigation case pre-filled with: title, summary as case description, top_events as initial evidence items (URL + source + credibility), link back to the signal. Sets `status='accepted'`.
-   - **Dismiss** → requires selecting a reason; sets `status='dismissed'`, `verdict='false_signal'`, and immediately fires the verdict callback with the dismissal note.
+   - **Dismiss** → requires a reason *and* which kind of no it is: `off_topic` (the default — real story, not our subject) or `false_signal` (the detection itself was wrong). Sets `status='dismissed'` and fires the verdict callback.
 3. **Case closure flow** — when closing a case linked to a signal, add a required field "Signal verdict": จริง (true_signal) / หลอก (false_signal) / สรุปไม่ได้ (inconclusive) + optional note. On save: update `external_signals`, fire the verdict callback.
 4. **Origin badge** — cases created from signals display a small "จาก Horizon" badge with a link to the original signal detail.
 

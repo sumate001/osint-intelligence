@@ -31,11 +31,17 @@ export function acceptSignal(id: string, data?: { title?: string; assigned_to?: 
   });
 }
 
-/** Rejects the signal; Horizon is told immediately that it was a false lead. */
-export function dismissSignal(id: string, reason: string) {
+/** What kind of "no" a dismissal is. Relevance and accuracy are different
+ * answers and Horizon reads them differently: `off_topic` says the detection
+ * was right and the story is simply not this newsroom's beat, while
+ * `false_signal` says the radar was wrong. Every dismissal used to be sent as
+ * the second one. */
+export type DismissKind = "off_topic" | "false_signal";
+
+export function dismissSignal(id: string, reason: string, verdict: DismissKind = "off_topic") {
   return apiFetch<ExternalSignal>(`/api/v1/signals/${id}/dismiss`, {
     method: "POST",
-    body: { reason },
+    body: { reason, verdict },
   });
 }
 

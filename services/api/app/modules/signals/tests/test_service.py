@@ -277,3 +277,23 @@ def test_server_trouble_is_retried(code):
 def test_a_rejected_verdict_is_not_retried(code):
     """Resending an unchanged body to a 4xx repeats the rejection."""
     assert is_retryable(code) is False
+
+
+@pytest.mark.unit
+def test_dismissing_defaults_to_relevance_not_accuracy():
+    """The bug an editor would never have seen.
+
+    Every dismissal used to be reported as `false_signal`. Most dismissals are
+    not that — the story is real and correctly detected, it simply is not this
+    newsroom's beat. Horizon's `verdicts` table is the corpus for tuning
+    detection thresholds, so clearing off-beat stories was quietly teaching the
+    radar to suppress the detections that were working.
+    """
+    assert SignalDismiss(reason="ไม่ใช่ประเด็นของเรา").verdict == "off_topic"
+
+
+@pytest.mark.unit
+def test_a_genuine_detection_error_can_still_be_reported():
+    """Relevance and accuracy are both real answers; the point is telling them
+    apart, not replacing one with the other."""
+    assert SignalDismiss(reason="ข่าวปลอม", verdict="false_signal").verdict == "false_signal"

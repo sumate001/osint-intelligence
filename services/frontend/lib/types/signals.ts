@@ -1,6 +1,9 @@
 export type SignalType = "weak_signal" | "trend_breakout";
 export type SignalStatus = "pending_review" | "accepted" | "dismissed" | "closed";
-export type SignalVerdict = "true_signal" | "false_signal" | "inconclusive";
+/** What the newsroom told Horizon. `off_topic` is feedback about relevance,
+ * not accuracy — the detection was right and the story is simply not our beat —
+ * and Horizon must not count it as a detection error. */
+export type SignalVerdict = "true_signal" | "false_signal" | "inconclusive" | "off_topic";
 export type CallbackStatus = "pending" | "delivered" | "failed" | "disabled";
 
 /** The body Horizon sent, kept verbatim on the signal row. */

@@ -56,8 +56,9 @@ export function useAcceptSignal() {
 }
 
 export function useDismissSignal() {
-  return useSignalMutation(({ id, reason }: { id: string; reason: string }) =>
-    api.dismissSignal(id, reason),
+  return useSignalMutation(
+    ({ id, reason, verdict }: { id: string; reason: string; verdict: api.DismissKind }) =>
+      api.dismissSignal(id, reason, verdict),
   );
 }
 

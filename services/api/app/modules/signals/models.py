@@ -22,7 +22,11 @@ from ...core.db import Base
 from ..investigation.models import Case  # noqa: F401
 
 STATUSES = ("pending_review", "accepted", "dismissed", "closed")
-VERDICTS = ("true_signal", "false_signal", "inconclusive")
+#: `off_topic` says the detection was right and the story is simply not this
+#: newsroom's beat. It is feedback about relevance, not accuracy, and Horizon
+#: must not read it as a detection error — every dismissal used to be sent as
+#: `false_signal`, which would have trained the radar against itself.
+VERDICTS = ("true_signal", "false_signal", "inconclusive", "off_topic")
 CALLBACK_STATUSES = ("pending", "delivered", "failed", "disabled")
 
 

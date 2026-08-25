@@ -93,6 +93,18 @@ class SignalAccept(BaseModel):
 
 
 class SignalDismiss(BaseModel):
+    """Rejecting a signal without opening a case.
+
+    Two different things were being reported as one. Dismissing used to always
+    send `false_signal`, but most dismissals are not "the detection was wrong" —
+    they are "this is real, it just is not our beat". Horizon's `verdicts` table
+    is the corpus for tuning detection thresholds, so an editor clearing off-beat
+    stories was teaching the radar to suppress the detections that were working.
+    """
+
+    #: What kind of no this is. `off_topic` is about relevance, `false_signal`
+    #: about accuracy, and only the second says anything about the detector.
+    verdict: Literal["off_topic", "false_signal"] = "off_topic"
     #: Required: dismissing without a stated reason teaches Horizon nothing.
     reason: str = Field(min_length=1)
 
@@ -100,7 +112,7 @@ class SignalDismiss(BaseModel):
 class SignalClose(BaseModel):
     """Closing a signal-originated case. The verdict is what Horizon learns from."""
 
-    verdict: Literal["true_signal", "false_signal", "inconclusive"]
+    verdict: Literal["true_signal", "false_signal", "inconclusive", "off_topic"]
     analyst_note: str | None = None
 
 

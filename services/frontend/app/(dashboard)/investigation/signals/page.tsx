@@ -11,6 +11,7 @@ import {
   useDismissSignal,
   useSignals,
 } from "@/lib/hooks/useSignals";
+import type { DismissKind } from "@/lib/api/signals";
 import type { ExternalSignal, SignalStatus } from "@/lib/types/signals";
 
 const TABS: { key: SignalStatus | "all"; labelKey: string }[] = [
@@ -54,6 +55,9 @@ function SignalRow({ signal }: { signal: ExternalSignal }) {
   const [open, setOpen] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [reason, setReason] = useState("");
+  // Defaults to off_topic: most dismissals are "not our beat", and sending
+  // those as false_signal trains Horizon against detections that were right.
+  const [dismissKind, setDismissKind] = useState<DismissKind>("off_topic");
   const accept = useAcceptSignal();
   const dismiss = useDismissSignal();
 
@@ -196,6 +200,28 @@ function SignalRow({ signal }: { signal: ExternalSignal }) {
 
           {pending && dismissing && (
             <div className="space-y-2 pt-1">
+              <p className="text-[11px] text-[var(--text-2)]">{t("signals.dismiss_kind")}</p>
+              <div className="grid gap-1.5">
+                {(
+                  [
+                    ["off_topic", "signals.dismiss_off_topic", "signals.dismiss_off_topic_hint"],
+                    ["false_signal", "signals.dismiss_false", "signals.dismiss_false_hint"],
+                  ] as const
+                ).map(([kind, label, hint]) => (
+                  <button
+                    key={kind}
+                    onClick={() => setDismissKind(kind)}
+                    className={`rounded-lg border px-3 py-2 text-left ${
+                      dismissKind === kind
+                        ? "border-[var(--accent)] bg-[var(--surface-3)]"
+                        : "border-[var(--border)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)]"
+                    }`}
+                  >
+                    <span className="block text-sm text-[var(--text)]">{t(label)}</span>
+                    <span className="block text-[11px] text-[var(--text-3)]">{t(hint)}</span>
+                  </button>
+                ))}
+              </div>
               <input
                 autoFocus
                 placeholder={t("signals.dismiss_reason_placeholder")}
@@ -203,10 +229,9 @@ function SignalRow({ signal }: { signal: ExternalSignal }) {
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)] outline-none"
               />
-              <p className="text-[11px] text-[var(--text-3)]">{t("signals.dismiss_hint")}</p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => dismiss.mutate({ id: signal.id, reason })}
+                  onClick={() => dismiss.mutate({ id: signal.id, reason, verdict: dismissKind })}
                   disabled={!reason.trim() || dismiss.isPending}
                   className="flex-1 bg-red-500/80 text-white text-sm rounded-lg py-2 hover:bg-red-500 disabled:opacity-50"
                 >

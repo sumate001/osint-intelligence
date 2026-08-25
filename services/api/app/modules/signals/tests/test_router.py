@@ -146,17 +146,36 @@ async def test_accepting_creates_a_case_with_the_events_as_evidence(db):
     assert "example.com" in (evidence[0].url or "")
 
 
-async def test_dismissing_records_a_false_signal_ready_for_callback(db):
+async def test_dismissing_reports_relevance_not_a_detection_error(db):
+    """A dismissal is usually "not our beat", and that is not the radar's fault.
+
+    This used to assert `false_signal` for every dismissal, which is what the
+    code did — and what Horizon then fed into the corpus it tunes detection
+    thresholds against. An editor clearing off-beat stories was training it to
+    suppress detections that had been correct.
+    """
     from app.modules.signals.schemas import SignalDismiss
 
     signal, _ = await service.ingest(db, SignalInbound(**body()))
-    await service.dismiss(db, signal, SignalDismiss(reason="ซ้ำกับที่ตรวจแล้ว"))
+    await service.dismiss(db, signal, SignalDismiss(reason="ไม่ใช่ประเด็นที่เราติดตาม"))
     await db.commit()
 
     assert signal.status == "dismissed"
-    assert signal.verdict == "false_signal"
+    assert signal.verdict == "off_topic"
     assert signal.callback_status == "pending"
     assert signal.closed_at is not None
+
+
+async def test_a_dismissal_can_still_say_the_detection_was_wrong(db):
+    from app.modules.signals.schemas import SignalDismiss
+
+    signal, _ = await service.ingest(db, SignalInbound(**body()))
+    await service.dismiss(
+        db, signal, SignalDismiss(reason="ข่าวปลอม", verdict="false_signal")
+    )
+    await db.commit()
+
+    assert signal.verdict == "false_signal"
 
 
 async def test_closing_marks_the_linked_case_closed_too(db):
