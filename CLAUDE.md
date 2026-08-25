@@ -555,6 +555,35 @@ external_signals(
 ## UI Additions (Investigation module)
 
 1. **Signals inbox** — new list view under Investigation: incoming signals with `pending_review` status. Columns: type badge (weak_signal / trend_breakout), title, scores, categories, received time. Row expands to show summary, top_events (with links), and force_assessments.
+## The newsroom map (`modules/geo/`)
+
+Horizon has extracted an `Event.location` for four out of five events since the
+beginning, and it reached nobody: the field was absent from
+`contracts/signal_inbound.schema.json`, so it never travelled. It is in the
+contract now, and `/map` is what it is for.
+
+Thai reporting gives an address, not a place name — "สำนักงานเทศบาลตำบลพ่อมิ่ง
+หมู่ที่ 3 ตำบลพ่อมิ่ง อำเภอปะนาเระ จังหวัดปัตตานี". Wikidata has no item for the
+whole string and one for each administrative unit inside it, so `candidates()`
+pulls the units out and tries them from the tightest pin to the loosest. Ordering
+by string length looked like a proxy for specificity and was not.
+
+- **Wikidata, not a commercial geocoder.** The Q-number comes back with the
+  coordinates, and it is what merges "จ.กาฬสินธุ์", "จังหวัดกาฬสินธุ์" and
+  "กาฬสินธุ์" into one pin instead of three stacked on one dot. Tiles are
+  OpenStreetMap for the same reason the stack is self-hosted: asking a provider
+  for the map of an investigation tells them what is being investigated.
+- **Cached per name, every outcome written** — including "Wikidata has nothing".
+  "ทำเนียบรัฐบาล" alone appears in 48 events, and an unresolvable name would
+  otherwise be re-queried forever against a free API.
+- **429 is expected.** Trying several administrative levels multiplies requests;
+  the client carries a penalty that outlives the request that earned it, because
+  a refusal is about the client, not that one call.
+- **`POST /map/geocode` is a separate pass**, never on the intake path.
+- **What is missing is reported, not dropped.** `unresolved` and
+  `unresolved_events` are on every response and shown under the map: one that
+  silently omits a third of the reporting is worse than one that says so.
+
 ## Signal profiles — what this newsroom is watching
 
 Horizon pushes every signal its detectors surface. It has no idea what any
@@ -579,6 +608,13 @@ which used to report back that the detection had been wrong.
 3. **No match is a real answer** — `profile_id` NULL has its own box. It means
    the engine surfaced something nobody asked for, which is worth seeing rather
    than filed somewhere convenient.
+
+**Filing runs off the request path.** `POST /inbound` stores the signal, answers,
+and queues `signals.file_into_profile` on the `intel` queue. Matching reads the
+beat descriptions with a model, and doing that inside the request made Horizon's
+deliveries time out and retry — the exact coupling this integration exists to
+avoid. Same rule as everywhere else here: anything a caller waits on stays off
+the model's path.
 
 **A category overlap used to file the signal on its own.** It looked free and
 deterministic and it was wrong within a day: `ความมั่นคง` covers the southern

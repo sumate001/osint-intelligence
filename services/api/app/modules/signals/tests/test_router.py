@@ -401,6 +401,9 @@ async def test_a_category_does_not_exclude_a_profile_either(db, monkeypatch):
     payload = body()
     payload["categories"] = ["พลังงาน"]  # shares nothing with the profile
     signal, _ = await service.ingest(db, SignalInbound(**payload))
+    # Filing runs off the request path now, so it is called directly rather than
+    # by ingesting — intake deliberately does not wait for the model.
+    await signals_service.match_profile(db, signal)
     await db.commit()
 
     # The profile must reach the model even though no category overlaps.

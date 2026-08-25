@@ -8,6 +8,7 @@ import { useT } from "@/lib/hooks/useT";
 import { cn } from "@/lib/utils/cn";
 import {
   LayoutDashboard,
+  Map,
   Newspaper,
   Search,
   ShieldCheck,
@@ -46,6 +47,9 @@ export function Sidebar() {
       icon: Radar,
       badge: signalCount?.pending_review || 0,
     },
+    // Next to the signals it draws from: the map is a second way of reading the
+    // same inbound stream, not a separate module.
+    { label: t("map.title"), href: "/map", icon: Map },
     { label: t("nav.verify"), href: "/verify", icon: ShieldCheck },
     { label: t("nav.brief"), href: "/brief", icon: FileText },
     { label: t("nav.intelligence"), href: "/intelligence", icon: Target },

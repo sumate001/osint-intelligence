@@ -152,14 +152,17 @@ async def ingest(db: AsyncSession, data: SignalInbound) -> tuple[ExternalSignal,
     )
     db.add(signal)
     await db.flush()
-    signal.profile_id, signal.profile_reason = await match_profile(db, signal)
+    # Filing is deliberately *not* done here. It needs the model, and this is the
+    # HTTP request Horizon is waiting on: putting a model call on it made
+    # deliveries time out and retry, which is the tight coupling this
+    # integration is built to avoid. The signal is stored and visible
+    # immediately; the router queues the filing.
     log.info(
         "signal received",
         extra={
             "signal_id": str(data.signal_id),
             "osint_signal_id": str(signal.id),
             "signal_type": data.signal_type,
-            "profile_id": str(signal.profile_id) if signal.profile_id else None,
         },
     )
     return signal, True

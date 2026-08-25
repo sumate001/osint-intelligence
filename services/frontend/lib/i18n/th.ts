@@ -85,6 +85,19 @@ const th = {
     score: "คะแนน",
     admiralty: "Admiralty",
   },
+  map: {
+    title: "แผนที่ข่าว",
+    subtitle: "ที่ที่รายงานข่าวบอกว่าเกิดเหตุ รวมจากทุกสัญญาณที่ Horizon ส่งเข้ามา",
+    all_beats: "ทุกประเด็น",
+    days: "{n} วัน",
+    events_here: "{n} เหตุการณ์ที่นี่",
+    and_more: "และอีก {n} รายการ",
+    located: "ปักหมุดได้ {events} เหตุการณ์ ใน {places} สถานที่",
+    unlocated: "ยังไม่รู้พิกัด {events} เหตุการณ์ ({places} ชื่อ)",
+    empty: "ยังไม่มีเหตุการณ์ที่รู้พิกัดในช่วงนี้",
+    empty_hint: "สัญญาณที่ส่งมาก่อนเพิ่มสถานที่เข้าสัญญาจะไม่มีพิกัด ของใหม่จะมี",
+  },
+
   signals: {
     title: "สัญญาณจาก Horizon",
     subtitle:

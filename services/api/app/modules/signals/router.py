@@ -30,7 +30,7 @@ from .schemas import (
     SignalProfileIn,
     SignalProfileOut,
 )
-from .tasks import send_verdict
+from .tasks import file_into_profile, send_verdict
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +63,13 @@ async def receive_signal(data: SignalInbound, db=Depends(get_db)):
     Idempotent: Horizon retries anything that is not a 202, so a repeat returns
     the id we already assigned instead of creating a duplicate lead.
     """
-    signal, _created = await service.ingest(db, data)
+    signal, created = await service.ingest(db, data)
+    await db.commit()
+    if created:
+        # Queued, not awaited: filing needs the model, and Horizon is holding
+        # this request open. A slow answer here becomes a delivery timeout and a
+        # retry on their side.
+        file_into_profile.delay(str(signal.id))
     return SignalInboundAck(osint_signal_id=str(signal.id))
 
 

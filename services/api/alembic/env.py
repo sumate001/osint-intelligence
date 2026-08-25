@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.source import Source
 from app.modules.triage.models import FeedItem
 from app.modules.signals.models import ExternalSignal
+from app.modules.geo.models import Place
 from app.core.config import get_settings
 
 config = context.config

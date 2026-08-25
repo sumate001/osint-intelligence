@@ -166,3 +166,40 @@ async def _bump(external_signal_id: str, attempts: int, error: str, status: str)
         signal.callback_error = error
         signal.callback_status = status
         await db.commit()
+
+
+@celery_app.task(name="signals.file_into_profile", bind=True, max_retries=2, queue="intel")
+def file_into_profile(self, external_signal_id: str) -> None:
+    """Decide which beat an inbound signal belongs to.
+
+    Off the request path on purpose. Matching reads the beat descriptions with a
+    model, which took long enough that Horizon's delivery timed out and retried —
+    the exact coupling this integration exists to avoid. Intake stores the signal
+    and answers; this decides where it goes a moment later.
+
+    A failure leaves the signal unfiled rather than lost: it shows in the box for
+    things nobody asked for until someone moves it or this runs again.
+    """
+    import uuid as _uuid
+
+    from .models import ExternalSignal
+    from .service import match_profile
+
+    async def run() -> None:
+        from ...core.db import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            signal = await db.get(ExternalSignal, _uuid.UUID(external_signal_id))
+            if signal is None or signal.profile_id is not None:
+                return
+            signal.profile_id, signal.profile_reason = await match_profile(db, signal)
+            await db.commit()
+            log.info(
+                "signal filed",
+                extra={
+                    "osint_signal_id": external_signal_id,
+                    "profile_id": str(signal.profile_id) if signal.profile_id else None,
+                },
+            )
+
+    asyncio.run(run())

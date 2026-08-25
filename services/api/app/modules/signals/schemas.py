@@ -21,6 +21,11 @@ class TopEvent(BaseModel):
     source_name: str
     credibility_weight: float = Field(ge=0.0, le=1.0)
     event_time: datetime | None = None
+    #: Where it happened, as the article said it. Horizon extracted this from the
+    #: start and it reached nobody until it was added to the contract. Optional,
+    #: because signals dispatched before that are still valid and a fifth of
+    #: events genuinely name no place.
+    location: str | None = None
 
 
 class ForceAssessment(BaseModel):

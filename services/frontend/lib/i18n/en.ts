@@ -87,6 +87,19 @@ const en: TranslationKeys = {
     score: "Score",
     admiralty: "Admiralty",
   },
+  map: {
+    title: "News map",
+    subtitle: "Where the reporting says things happened, across every signal Horizon has sent",
+    all_beats: "All beats",
+    days: "{n} days",
+    events_here: "{n} events here",
+    and_more: "and {n} more",
+    located: "{events} events across {places} places",
+    unlocated: "{events} events not located yet ({places} names)",
+    empty: "No located events in this window",
+    empty_hint: "Signals sent before the location field was added carry none; new ones do.",
+  },
+
   signals: {
     title: "Horizon signals",
     subtitle:
