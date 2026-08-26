@@ -2,19 +2,34 @@
 # ══════════════════════════════════════════════════════════════════════
 #  OSINT//DESK — One-command deploy (production)
 #  ใช้งาน:
-#    ./deploy.sh              # ติดตั้ง + ตั้งค่าครั้งแรก (interactive)
-#    ./deploy.sh --update     # git pull + rebuild + migrate (zero-downtime)
+#    ./deploy.sh              # ติดตั้งครั้งแรก — ถามค่าที่ยังไม่มี
+#    ./deploy.sh --yes        # ติดตั้งโดยไม่ถามอะไรเลย (คำสั่งเดียวจบ)
+#    ./deploy.sh --update     # git pull + rebuild + migrate
 #    ./deploy.sh --down       # หยุดทุก service
-#    ./deploy.sh --restart    # restart api + worker + beat
+#    ./deploy.sh --restart    # โหลด .env ใหม่แล้วเริ่ม service ที่ทำงานจริง
 #    ./deploy.sh --logs       # ดู live logs
 #    ./deploy.sh --status     # ดูสถานะ containers
 #    ./deploy.sh --ssl        # ตั้งค่า SSL (Let's Encrypt)
+#
+#  --yes ไม่ถามอะไรเลย: ค่าที่ขาดจะถูกสร้างให้ (SECRET_KEY, รหัสผ่าน, API key)
+#  แล้วพิมพ์ออกมาตอนจบ เหมาะกับการติดตั้งซ้ำ เครื่องใหม่ หรือ CI
+#  ค่าที่ *มีอยู่แล้ว* ใน .env จะไม่ถูกแตะ — รันซ้ำได้เสมอ
 # ══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
 COMPOSE_FILE="docker-compose.yml"
 ENV_FILE=".env"
 ENV_EXAMPLE=".env.example"
+
+# ── service ที่มีงานทำจริง ───────────────────────────────────────────
+# `worker` (คิว triage) กับ `beat` ยังอยู่ใน compose แต่ไม่มีงานแล้ว: การดึงข่าว
+# ย้ายไป Horizon และ beat_schedule ว่างเปล่า (ดู app/worker.py) การ restart หรือ
+# tail log ตัวที่ไม่ทำอะไรทำให้เข้าใจผิดว่าระบบยุ่งกว่าที่เป็น
+LIVE_SERVICES="api worker-intel frontend"
+BUILD_SERVICES="api worker-intel frontend"
+
+# ตอบ prompt ทั้งหมดด้วยค่าที่มีอยู่หรือค่าที่สร้างให้ ไม่รอ input
+ASSUME_YES=false
 
 # ── สี ───────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -32,6 +47,11 @@ bold() { echo -e "${BOLD}$*${NC}"; }
 hr()   { echo -e "${CYAN}══════════════════════════════════════════════${NC}"; }
 
 # ── subcommand shortcuts ─────────────────────────────────────────────
+if [ "${1:-}" = "--yes" ] || [ "${1:-}" = "-y" ]; then
+  ASSUME_YES=true
+  shift || true
+fi
+
 case "${1:-}" in
   --down)
     info "หยุด OSINT//DESK..."
@@ -40,13 +60,16 @@ case "${1:-}" in
     exit 0 ;;
 
   --restart)
-    info "Restart api + worker + worker-intel + beat..."
-    docker compose -f "$COMPOSE_FILE" restart api worker worker-intel beat
+    # `restart` keeps the old process environment, and get_settings() is
+    # lru_cached — so a plain restart after editing .env looks like it worked and
+    # runs on the old values. Recreating is the only way the change takes.
+    info "โหลด .env ใหม่แล้วเริ่ม $LIVE_SERVICES..."
+    docker compose -f "$COMPOSE_FILE" up -d --force-recreate $LIVE_SERVICES
     ok "restart แล้ว"
     exit 0 ;;
 
   --logs)
-    docker compose -f "$COMPOSE_FILE" logs -f api worker worker-intel beat
+    docker compose -f "$COMPOSE_FILE" logs -f $LIVE_SERVICES
     exit 0 ;;
 
   --status)
@@ -99,12 +122,12 @@ case "${1:-}" in
     sed -i 's|^MINIO_ENDPOINT=http://|MINIO_ENDPOINT=|' "$ENV_FILE"
     # Rebuild and restart (rolling: workers first, then api, then frontend)
     info "Rebuild images..."
-    DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build --parallel api worker frontend 2>&1 \
+    DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build --parallel $BUILD_SERVICES 2>&1 \
       | grep -E "^(#[0-9]+ |Step|Successfully built|ERROR|error)" || true
     ok "Build เสร็จ"
     echo ""
     info "Restart services..."
-    docker compose -f "$COMPOSE_FILE" up -d --no-deps worker worker-intel beat
+    docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate worker-intel
     docker compose -f "$COMPOSE_FILE" up -d --no-deps api
     docker compose -f "$COMPOSE_FILE" up -d --no-deps frontend nginx
     echo ""
@@ -180,7 +203,13 @@ if [ ! -f "$ENV_FILE" ] && [ ! -f "$ENV_EXAMPLE" ]; then
   exit 1
 fi
 
+# Whether this is a first install decides whether a placeholder password may be
+# replaced. On an existing deployment it may not: Postgres bakes its password
+# into the data volume at init, so rotating it in .env does not change the
+# database — it only stops the app being able to reach it.
+FIRST_INSTALL=false
 if [ ! -f "$ENV_FILE" ]; then
+  FIRST_INSTALL=true
   cp "$ENV_EXAMPLE" "$ENV_FILE"
   SECRET=$(openssl rand -hex 32)
   sed -i "s/change_this_to_a_random_secret_key/$SECRET/" "$ENV_FILE"
@@ -202,39 +231,93 @@ _ensure_var "MINIO_ENDPOINT"      "minio:9000"
 _ensure_var "REQUIREMENTS_MODEL"  "gemma4:12b"
 _ensure_var "DECEPTION_MODEL"     "gemma4:12b"
 _ensure_var "DARKWEB_MODEL"       "gemma4:12b"
+# Horizon integration. Without an inbound key the endpoint refuses everything —
+# which is the right default for something reachable from outside, but a fresh
+# install then looks broken rather than unconfigured, so one is generated.
+_ensure_var "HORIZON_INBOUND_API_KEY" "$(openssl rand -hex 16)"
+_ensure_var "HORIZON_BASE_URL"        ""
+_ensure_var "HORIZON_API_KEY"         ""
+# Off puts a live model on the path of every inbound signal. On is correct in
+# production; the test suite turns it off.
+_ensure_var "SIGNAL_PROFILE_MATCHING" "true"
 
 # แก้ MINIO_ENDPOINT ถ้ายังมี http:// นำหน้า
 sed -i 's|^MINIO_ENDPOINT=http://|MINIO_ENDPOINT=|' "$ENV_FILE"
 
+# SECRET_KEY ที่ยังเป็นค่าจาก .env.example ไม่ใช่ความลับ — มันอยู่ใน repo ให้ใคร
+# ก็อ่านได้ และมันคือกุญแจเซ็น JWT ใครที่อ่านเจอก็ปลอม token เข้าระบบได้
+if grep -q '^SECRET_KEY=change_this_to_a_random_secret_key' "$ENV_FILE"; then
+  sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -hex 32)|" "$ENV_FILE"
+  warn "SECRET_KEY ยังเป็นค่าตัวอย่างจาก repo — เปลี่ยนให้แล้ว (token ที่ค้างอยู่จะใช้ไม่ได้ ต้องล็อกอินใหม่)"
+fi
+
 set -a; source "$ENV_FILE"; set +a
 
-# ── 3. Interactive setup ─────────────────────────────────────────────
+# ── 3. ตั้งค่าระบบ ───────────────────────────────────────────────────
 echo ""
 bold "── ตั้งค่าระบบ ──────────────────────────────────────"
 echo ""
 
+GENERATED=()
+
+# Prompt, or take the default without asking when --yes is set. Values already
+# in .env are the defaults, so a re-run never overwrites a working install.
+_ask() {
+  local prompt="$1" current="$2" answer
+  if [ "$ASSUME_YES" = true ]; then
+    printf '%s' "$current"
+    return
+  fi
+  echo -e "  ${prompt} ${CYAN}[${current}]${NC}: \c" >&2
+  read -r answer
+  printf '%s' "${answer:-$current}"
+}
+
+# A password that is still the shipped placeholder is not a password — it is in
+# the repo for anyone to read. Under --yes a real one is generated and reported
+# at the end.
+#
+# Only on a first install, though. Postgres, Neo4j and MinIO each bake their
+# password into the data volume the first time they start, so changing it in
+# .env afterwards does not change theirs: it only stops the app reaching them.
+# A deploy script that takes a working system offline to improve its passwords
+# has not improved anything.
+_secret_or_generate() {
+  local current="$1"
+  if [ "$FIRST_INSTALL" != true ]; then
+    printf '%s' "$current"
+    return
+  fi
+  case "$current" in
+    ""|changeme|changeme123|change_this_to_a_random_secret_key|changeme_master_key)
+      openssl rand -hex 16 ;;
+    *) printf '%s' "$current" ;;
+  esac
+}
+
 # ── Ollama URL ──
 CURRENT_OLLAMA="${OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
-echo -e "  Ollama URL ${CYAN}[${CURRENT_OLLAMA}]${NC}: \c"
-read -r INPUT_OLLAMA
-OLLAMA_URL="${INPUT_OLLAMA:-$CURRENT_OLLAMA}"
-
-if curl -sf --max-time 3 "${OLLAMA_URL/host.docker.internal/localhost}/api/tags" &>/dev/null; then
-  MODEL_COUNT=$(curl -s "${OLLAMA_URL/host.docker.internal/localhost}/api/tags" \
-    | grep -c '"name"' 2>/dev/null || echo 0)
-  ok "Ollama ตอบสนอง ($MODEL_COUNT models)"
-else
-  warn "ไม่สามารถเชื่อมต่อ Ollama — AI features จะไม่ทำงานจนกว่า Ollama จะพร้อม"
-fi
+OLLAMA_URL=$(_ask "Ollama URL" "$CURRENT_OLLAMA")
 sed -i "s|OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$OLLAMA_URL|" "$ENV_FILE"
+# Checked later from inside a container, not from here. Testing it on the host
+# with host.docker.internal rewritten to localhost answers a different question
+# than the one that matters, and it answered "fine" for a URL no container could
+# reach — every AI feature was silently dead until that was noticed by hand.
 echo ""
 
 # ── Passwords ──
+# Runs inside $( ), so it cannot record anything for the caller: an array
+# appended to in a subshell is discarded when it exits. The caller compares the
+# answer against what it passed in instead — see _note_if_generated.
 _read_password() {
   local prompt="$1" current="$2" minlen="${3:-1}" result
+  if [ "$ASSUME_YES" = true ]; then
+    _secret_or_generate "$current"
+    return
+  fi
   while true; do
-    echo -e "  ${prompt} ${CYAN}[${current}]${NC}: \c"
-    read -rs result; echo ""
+    echo -e "  ${prompt} ${CYAN}[${current}]${NC}: \c" >&2
+    read -rs result; echo "" >&2
     result="${result:-$current}"
     if [ ${#result} -lt "$minlen" ]; then
       warn "รหัสผ่านต้องมีอย่างน้อย ${minlen} ตัวอักษร"
@@ -245,32 +328,31 @@ _read_password() {
   done
 }
 
-PG_PASS=$(_read_password   "Postgres password" "${POSTGRES_PASSWORD:-changeme}" 1)
+# Recorded here, in the parent shell, for the reason above.
+_note_if_generated() {
+  [ "$2" != "$3" ] && GENERATED+=("$1")
+  return 0
+}
+
+PG_PASS=$(_read_password    "Postgres password" "${POSTGRES_PASSWORD:-changeme}" 1)
+_note_if_generated "Postgres password" "$PG_PASS" "${POSTGRES_PASSWORD:-changeme}"
 NEO4J_PASS=$(_read_password "Neo4j password   (≥8 chars)" "${NEO4J_PASSWORD:-changeme123}" 8)
+_note_if_generated "Neo4j password" "$NEO4J_PASS" "${NEO4J_PASSWORD:-changeme123}"
 MINIO_PASS=$(_read_password "MinIO password   (≥8 chars)" "${MINIO_PASSWORD:-changeme123}" 8)
+_note_if_generated "MinIO password" "$MINIO_PASS" "${MINIO_PASSWORD:-changeme123}"
 echo ""
 
 # ── Zep API key (optional) ──
-CURRENT_ZEP="${ZEP_API_KEY:-}"
-echo -e "  Zep API key (optional) ${CYAN}[${CURRENT_ZEP:-(ข้าม)}]${NC}: \c"
-read -r INPUT_ZEP
-ZEP_KEY="${INPUT_ZEP:-$CURRENT_ZEP}"
+ZEP_KEY=$(_ask "Zep API key (optional)" "${ZEP_API_KEY:-}")
 [ -n "$ZEP_KEY" ] && ok "Zep key set → MiroFish agent memory เปิดใช้งาน" \
                   || warn "ไม่มี Zep key → MiroFish LLM fallback"
 echo ""
 
 # ── Admin account ──
-echo -e "  Admin email    ${CYAN}[admin@osintdesk.local]${NC}: \c"
-read -r INPUT_EMAIL
-ADMIN_EMAIL="${INPUT_EMAIL:-admin@osintdesk.local}"
-
-echo -e "  Admin password ${CYAN}[changeme]${NC}: \c"
-read -rs INPUT_ADMIN_PASS; echo ""
-ADMIN_PASS="${INPUT_ADMIN_PASS:-changeme}"
-
-echo -e "  Admin name     ${CYAN}[System Admin]${NC}: \c"
-read -r INPUT_NAME
-ADMIN_NAME="${INPUT_NAME:-System Admin}"
+ADMIN_EMAIL=$(_ask "Admin email" "${ADMIN_EMAIL:-admin@osintdesk.local}")
+ADMIN_PASS=$(_read_password "Admin password" "${ADMIN_PASSWORD:-changeme}" 1)
+_note_if_generated "Admin password" "$ADMIN_PASS" "${ADMIN_PASSWORD:-changeme}"
+ADMIN_NAME=$(_ask "Admin name" "${ADMIN_NAME:-System Admin}")
 
 # บันทึกลง .env
 sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$PG_PASS|" "$ENV_FILE"
@@ -283,7 +365,7 @@ set -a; source "$ENV_FILE"; set +a
 # ── 4. Build images ──────────────────────────────────────────────────
 echo ""
 info "Build Docker images..."
-DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build --parallel api worker frontend 2>&1 \
+DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build --parallel $BUILD_SERVICES 2>&1 \
   | grep -E "^(#[0-9]+ |Step|Successfully built|ERROR|error)" || true
 ok "Build เสร็จ"
 
@@ -338,6 +420,23 @@ wait_for "MiroFish"     "curl -sf http://localhost:5002/health | grep -q ok" 120
 wait_for "Perplexica"   "curl -sf http://localhost:3002/ -o /dev/null" 120 true
 
 echo ""
+
+# ── 6b. Ollama — ตรวจจากในคอนเทนเนอร์ ────────────────────────────────
+# ตรวจจากโฮสต์ตอบคนละคำถามกับที่ต้องการรู้: โฮสต์เข้าถึงอะไรได้ไม่ได้แปลว่า
+# คอนเทนเนอร์เข้าถึงได้ ค่าที่ตั้งไว้เคยเป็น host.docker.internal ในขณะที่ Ollama
+# อยู่คนละเครื่อง — โฮสต์ทดสอบผ่าน คอนเทนเนอร์ต่อไม่ติด และทุกฟีเจอร์ที่ใช้
+# โมเดลตายเงียบอยู่หลายวันกว่าจะมีคนสังเกต
+echo ""
+info "ตรวจ Ollama จากในคอนเทนเนอร์..."
+OLLAMA_IN_CONTAINER=$(docker exec osint-api sh -c \
+  'curl -sf --max-time 5 "$OLLAMA_BASE_URL/api/tags" | grep -c "\"name\"" || echo 0' 2>/dev/null || echo 0)
+if [ "${OLLAMA_IN_CONTAINER:-0}" -gt 0 ]; then
+  ok "Ollama ตอบสนองจากในคอนเทนเนอร์ ($OLLAMA_IN_CONTAINER models)"
+else
+  warn "คอนเทนเนอร์ต่อ Ollama ไม่ได้ที่ $OLLAMA_URL"
+  warn "ทุกฟีเจอร์ที่ใช้โมเดลจะไม่ทำงาน (brief, verify, จับคู่ประเด็น, simulation)"
+  warn "ถ้า Ollama อยู่คนละเครื่อง ให้ใส่ IP ที่คอนเทนเนอร์เข้าถึงได้ ไม่ใช่ localhost"
+fi
 
 # ── 7. Database migrations ───────────────────────────────────────────
 info "รัน database migrations..."
@@ -408,9 +507,33 @@ echo -e "  ${BOLD}Login:${NC}"
 echo -e "  Email:    ${CYAN}${ADMIN_EMAIL}${NC}"
 echo -e "  Password: ${CYAN}${ADMIN_PASS}${NC}"
 echo ""
+
+# Anything generated is printed once, here. A password nobody was told is the
+# same as a locked door — and under --yes nobody was asked.
+if [ ${#GENERATED[@]} -gt 0 ]; then
+  warn "สร้างค่าลับใหม่ให้ (จดไว้ — อยู่ใน .env ด้วย):"
+  for item in "${GENERATED[@]}"; do echo -e "    ${CYAN}${item}${NC}"; done
+  echo ""
+fi
+
+if [ "$FIRST_INSTALL" != true ]; then
+  WEAK=$(grep -cE '^(POSTGRES_PASSWORD|NEO4J_PASSWORD|MINIO_PASSWORD|MEILI_MASTER_KEY)=(changeme|changeme123|changeme_master_key)$' "$ENV_FILE" || true)
+  if [ "${WEAK:-0}" -gt 0 ]; then
+    warn "$WEAK รหัสผ่านยังเป็นค่าตัวอย่างจาก repo"
+    warn "เปลี่ยนไม่ได้อัตโนมัติ — Postgres/Neo4j/MinIO ฝังรหัสไว้ใน volume ตอน init"
+    warn "ถ้าจะเปลี่ยนต้องแก้ใน service นั้นเองก่อน แล้วค่อยแก้ .env ให้ตรงกัน"
+    echo ""
+  fi
+fi
+
+echo -e "  ${BOLD}ที่ทำงานจริง:${NC}"
+echo -e "  api · worker-intel · frontend · nginx"
+echo -e "  ${YELLOW}worker (คิว triage) และ beat ไม่มีงานแล้ว${NC} — การดึงข่าวย้ายไป Horizon"
+echo ""
 echo -e "  ${BOLD}Commands:${NC}"
+echo -e "  ./deploy.sh --yes       ติดตั้งซ้ำโดยไม่ถามอะไร"
 echo -e "  ./deploy.sh --update    git pull + rebuild + migrate"
-echo -e "  ./deploy.sh --restart   restart api + worker + worker-intel"
+echo -e "  ./deploy.sh --restart   โหลด .env ใหม่แล้วเริ่ม api + worker-intel + frontend"
 echo -e "  ./deploy.sh --ssl       ตั้งค่า SSL (Let's Encrypt)"
 echo -e "  ./deploy.sh --logs      live logs"
 echo -e "  ./deploy.sh --status    สถานะ containers"

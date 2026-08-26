@@ -1,101 +1,142 @@
 # เริ่มต้นที่นี่ — ขึ้น OSINT//DESK บน Ubuntu
 
-ระบบนี้พร้อมใช้งานแล้ว (Phase 0–5 สมบูรณ์) — รันคำสั่งเดียวจบ
+```bash
+git clone <repo-url> osintdesk && cd osintdesk
+./deploy.sh --yes
+```
+
+จบ ไม่ถามอะไรเลย ค่าที่ขาดจะถูกสร้างให้และพิมพ์ออกมาตอนจบ
+
+ถ้าอยากตั้งค่าเองระหว่างติดตั้ง ใช้ `./deploy.sh` เฉย ๆ — จะถามทีละอย่างโดยมีค่า
+เดิมเป็นค่าตั้งต้น รันซ้ำได้เสมอ ของที่ตั้งไว้แล้วจะไม่ถูกแตะ
 
 ---
 
-## สิ่งที่ต้องมีบน Ubuntu ก่อน
+## OSINT//DESK ทำอะไร และไม่ทำอะไร
 
-| สิ่งที่ต้องการ | ขั้นต่ำ | ตรวจสอบ |
+**ไม่ดึงข่าวเอง** — การดึงข่าว คัดกรอง จัดกลุ่ม และตรวจจับสัญญาณ อยู่ที่ **Horizon**
+ซึ่งเป็นระบบแยกอีกตัว DESK คือ *ขั้นตอนที่ 10* ของท่อนั้น: ที่ที่คนลงมือสืบสวน
+
+```
+Horizon                                    OSINT//DESK
+ดึงข่าว → คัดกรอง → จัดกลุ่ม → ตรวจจับ  ──►  กล่องสัญญาณ → คดี → บทความ
+                                     ◄──  verdict กลับไปสอนเรดาร์
+```
+
+ติดตั้ง DESK อย่างเดียวก็ใช้ได้ แต่กล่องสัญญาณจะว่าง จนกว่าจะต่อ Horizon
+
+---
+
+## สิ่งที่ต้องมีก่อน
+
+| | ขั้นต่ำ | ตรวจ |
 |---|---|---|
-| Docker + Docker Compose plugin | 24+ / 2.20+ | `docker compose version` |
+| Docker + Compose plugin | 24+ / 2.20+ | `docker compose version` |
 | RAM | 16 GB | `free -h` |
 | Disk | 50 GB ว่าง | `df -h` |
-| Ollama | latest | `curl http://localhost:11434/api/tags` |
+| Ollama | มี `gemma4:12b` | ดูด้านล่าง |
 
-ถ้า Ollama ยังไม่มี model:
 ```bash
-ollama pull gemma4:12b        # โมเดลหลัก — brief, vision, simulation, requirements, deception, darkweb (ต้องมี)
-ollama pull gemma4:e4b        # triage queue — เร็วกว่า ใช้ VRAM น้อยกว่า (~3GB)
-ollama pull whisper           # ถอดเสียง audio/video (deploy.sh pull ให้อัตโนมัติ)
+ollama pull gemma4:12b   # โมเดลเดียวที่ทุกฟีเจอร์ใช้
+ollama pull whisper      # ถอดเสียง (deploy.sh ดึงให้เอง)
 ```
 
-> **หมายเหตุ GPU:** `gemma4:12b` (~8.4 GB) และ `gemma4:e4b` (~3 GB) โหลดพร้อมกันได้บน GPU ที่มี VRAM รวม ≥ 12 GB
-> ถ้า VRAM ไม่พอสำหรับ `gemma4:12b` ใช้ `qwen3:8b` แทนได้ (ปรับใน `.env` หรือ Admin → Settings → AI)
+`gemma4:12b` กิน VRAM ~8.4 GB ถ้าไม่พอ เปลี่ยนได้ที่ Admin → Settings → AI
+โดยไม่ต้อง restart
+
+### ถ้า Ollama อยู่คนละเครื่อง — จุดที่พลาดกันบ่อยที่สุด
+
+ค่าตั้งต้นคือ `http://host.docker.internal:11434` ซึ่งหมายถึง *เครื่องที่รัน
+Docker* ถ้า Ollama อยู่คนละเครื่อง ต้องใส่ IP ที่ **คอนเทนเนอร์** เข้าถึงได้:
+
+```bash
+OLLAMA_BASE_URL=http://100.94.37.18:11434    # ไม่ใช่ localhost
+```
+
+`curl http://localhost:11434` ที่รันบนโฮสต์**ตอบคนละคำถาม**กับที่ต้องการรู้ — เคย
+ผ่านฉลุยในขณะที่ไม่มีคอนเทนเนอร์ไหนต่อติดเลย และทุกฟีเจอร์ที่ใช้โมเดลตายเงียบ
+อยู่หลายวัน `deploy.sh` จึงตรวจจากในคอนเทนเนอร์ให้ ตรวจเองได้ด้วย:
+
+```bash
+docker exec osint-api sh -c 'curl -s "$OLLAMA_BASE_URL/api/tags" | head -c 200'
+```
 
 ---
 
-## ขั้นตอนเดียว — ติดตั้งและรัน
+## หลังติดตั้ง
 
-```bash
-# Clone repo
-git clone <repo-url> osintdesk && cd osintdesk
+- **UI** → `http://localhost`
+- **API docs** → `http://localhost:8000/docs`
+- **Login** → อีเมลกับรหัสที่ script พิมพ์ออกมาตอนจบ
 
-# รัน deploy script
-./deploy.sh
-```
+เปลี่ยนรหัสทันทีที่ Admin → Settings → Users
 
-script จะถามรหัสผ่านสำหรับ PostgreSQL, Neo4j, MinIO และ Ollama URL
-จากนั้นทำทุกอย่างอัตโนมัติ: build images → ขึ้น services → migrate DB → seed admin → ตรวจสอบ integration
+### สามหน้าที่ควรเปิดก่อน
 
-เมื่อเสร็จ เปิดเบราว์เซอร์:
-- **UI** → `http://localhost` (ผ่าน nginx port 80)
-- **API Docs** → `http://localhost:8000/docs`
-
-**Login:** `admin@osintdesk.local` / รหัสผ่านที่กรอกตอน `./deploy.sh`
-
-> เปลี่ยน password ทันทีหลัง login ครั้งแรก: Admin → Settings → Users
+| หน้า | ทำอะไร |
+|---|---|
+| **สัญญาณจาก Horizon** | กล่องขาเข้า — ตั้ง "ประเด็นที่เราตามอยู่" ที่นี่ก่อน ไม่งั้นทุกอย่างจะกองรวมกัน |
+| **แผนที่ข่าว** | เหตุการณ์บนแผนที่ กรองตามประเด็นและช่วงเวลา |
+| **Investigation** | คดีที่เปิดจากสัญญาณ พร้อมหลักฐานและตัวละคร |
 
 ---
 
 ## คำสั่งที่ใช้บ่อย
 
 ```bash
-./deploy.sh --update    # อัพเดทโค้ด — rebuild images + restart (ไม่ถามรหัสผ่านซ้ำ)
-./deploy.sh --restart   # restart api + worker + worker-intel เร็วกว่า rebuild
-./deploy.sh --logs      # ดู live logs ทุก service
+./deploy.sh --yes       # ติดตั้ง/ติดตั้งซ้ำ ไม่ถามอะไร
+./deploy.sh --update    # git pull + rebuild + migrate
+./deploy.sh --restart   # โหลด .env ใหม่แล้วเริ่ม service ที่ทำงานจริง
+./deploy.sh --logs      # live logs
+./deploy.sh --status    # สถานะ containers
 ./deploy.sh --down      # หยุดทุก service
 ```
 
+`--restart` ใช้ `up -d --force-recreate` ไม่ใช่ `docker compose restart` เพราะ
+`get_settings()` มี `lru_cache` — restart เฉย ๆ จะรันด้วยค่า env เดิมทั้งที่ดู
+เหมือนสำเร็จ
+
 ---
 
-## ถ้า Ollama อยู่คนละเครื่อง
+## Service ไหนทำงานจริง
 
-แก้ `.env` ก่อนรัน `./deploy.sh`:
-```bash
-nano .env
-# เปลี่ยน:
-OLLAMA_BASE_URL=http://192.168.1.100:11434   # IP ของเครื่อง Ollama จริง
+```
+api · worker-intel · frontend · nginx · postgres · redis
 ```
 
----
-
-## Dark Web Module (Phase 5)
-
-Dark web module **ปิดอยู่โดย default** — ต้องทำก่อนเปิดใช้:
-
-1. ขอ legal approval เป็นลายลักษณ์อักษรจากฝ่ายกฎหมายขององค์กร
-2. อ่าน `docs/specs/11_darkweb_module.md` — ครบทุกข้อ
-3. ตั้ง editorial policy สำหรับ query ที่อนุญาต
-4. เปิดใช้ใน Admin → Settings → Dark Web
-
-ไม่มีเหตุผลด้านเทคนิคที่ต้องรีบเปิด — ข้ามไปก่อนได้
+`worker` (คิว `triage`) กับ `beat` ยังอยู่ใน compose แต่**ไม่มีงานแล้ว** — การดึง
+ข่าวย้ายไป Horizon และ `beat_schedule` ว่างเปล่า อะไรที่ผู้ใช้นั่งรอผลต้องส่งเข้า
+คิว `intel` เสมอ
 
 ---
 
-## ถ้าระบบขึ้นแล้วมีปัญหา
+## Dark Web Module — ปิดอยู่โดยตั้งใจ
+
+ต้องทำก่อนเปิด:
+
+1. ขอ legal approval เป็นลายลักษณ์อักษรจากฝ่ายกฎหมาย
+2. อ่าน `docs/specs/11_darkweb_module.md` ให้ครบ
+3. ตั้ง editorial policy ว่า query แบบไหนอนุญาต
+4. เปิดที่ Admin → Settings → Dark Web
+
+ไม่มีเหตุผลทางเทคนิคที่ต้องรีบเปิด ข้ามไปก่อนได้
+
+---
+
+## เมื่อมีปัญหา
 
 ```bash
-# ดู logs service ที่มีปัญหา
-docker compose logs -f api
-docker compose logs -f worker          # triage queue (feed ingestion)
-docker compose logs -f worker-intel    # intel queue (SpiderFoot, PIR matching)
-
-# ตรวจ health ทุก service
+docker compose logs -f api            # API
+docker compose logs -f worker-intel   # งานเบื้องหลังทั้งหมด
 curl http://localhost:8000/api/v1/admin/health
 
-# force recreate ถ้า env var ไม่โหลด (get_settings() มี lru_cache)
-docker compose up -d --force-recreate api worker worker-intel
+# env var ไม่โหลด (get_settings() มี lru_cache)
+docker compose up -d --force-recreate api worker-intel
 ```
 
-เอกสารเพิ่มเติม: `README.md` (workflow), `CLAUDE.md` (สำหรับ developer), `docs/roadmap.md`
+**สัญญาณไม่เข้ามาเลย** → ดูที่ Horizon ก่อน DESK เป็นฝ่ายรับอย่างเดียว
+**กล่องสัญญาณมีแต่ของไม่เกี่ยว** → ยังไม่ได้ตั้งประเด็นที่ติดตาม
+**แผนที่ว่าง** → สัญญาณที่ส่งมาก่อนเพิ่ม `location` เข้าสัญญาไม่มีพิกัด ของใหม่มี
+
+เอกสารเพิ่มเติม: `README.md` (ภาพรวมและ workflow) · `CLAUDE.md` (สำหรับ developer)
+· `docs/roadmap.md` (สถานะฟีเจอร์)

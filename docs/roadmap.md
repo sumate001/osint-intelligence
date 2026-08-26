@@ -28,9 +28,14 @@
 
 ---
 
-## Phase 1 — Ingestion + Triage (สัปดาห์ 3-4)
+## Phase 1 — Ingestion + Triage (สัปดาห์ 3-4) — **ย้ายไป Horizon แล้ว**
 
-**เป้าหมาย:** ข่าวไหลเข้า ได้คะแนน แสดงใน Today's Intel
+> ทำเสร็จและใช้งานจริงในเฟสนี้ แต่ภายหลังการดึงข่าวและคัดกรองทั้งหมดย้ายไป
+> Horizon ซึ่งเป็นระบบแยก DESK รับสัญญาณที่ตรวจเจอแล้วเข้ามาแทน โค้ดในหัวข้อนี้
+> ยังอยู่ในรีโปและยังรันได้ แต่ไม่ใช่ทางหลัก และ worker คิว `triage` ไม่ได้เปิด
+> ในการติดตั้งปกติ
+
+**เป้าหมายเดิม:** ข่าวไหลเข้า ได้คะแนน แสดงใน Today's Intel
 
 อ่าน: `docs/specs/06_adapter_framework.md`, `07_adapter_spec.md` · mockup: `08_adapter_ui.html`, `04_app_prototype.html`
 
@@ -108,6 +113,24 @@
 - [x] Monitoring: Grafana dashboards
 
 **สาธิตได้:** trigger simulation จาก high-impact case, dark web monitoring (ถ้า legal อนุมัติ)
+
+---
+
+## Phase 6 — Horizon integration (เสร็จแล้ว)
+
+**เป้าหมาย:** DESK เลิกดึงข่าวเอง มารับสัญญาณจากเรดาร์แทน และตอบกลับสิ่งที่เรียนรู้
+
+- [x] `modules/signals/` — inbound endpoint (idempotent ตาม `signal_id`), accept → คดี, close → verdict callback
+- [x] `contracts/*.json` — สัญญาร่วมสองรีโป มีเทสต์ผูกทั้ง schema และ Pydantic ไว้ด้วยกัน
+- [x] `off_topic` แยกความเกี่ยวข้องออกจากความถูกต้อง — การตีกลับเพราะนอกประเด็นเคย
+      ถูกรายงานว่าเรดาร์ตรวจผิด ซึ่งสอนให้มันกดสิ่งที่ทำถูกอยู่แล้ว
+- [x] `signal_profiles` — กองบรรณาธิการบอกได้ว่าตามหาข่าวแบบไหน จับคู่บนคิว `intel`
+      ไม่ใช่บนคำขอ HTTP (เคยทำให้ Horizon ส่งไม่ผ่านเพราะ timeout)
+- [x] `modules/knowledge/` ความจำข้ามคดีทำงานจริง — แมตช์ด้วย Q-number ก่อนตัวสะกด
+- [x] `modules/geo/` + หน้า `/map` — สถานที่ในข่าว → พิกัด → แผนที่
+
+**สาธิตได้:** Horizon ตรวจเจอสัญญาณ → เข้ากล่องตามประเด็นที่ตั้งไว้ → รับเป็นคดี
+พร้อมหลักฐาน → ปิดพร้อม verdict → Horizon บันทึกไว้ปรับเกณฑ์
 
 ---
 

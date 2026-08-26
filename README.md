@@ -1,10 +1,19 @@
 # OSINT//DESK
 
-แพลตฟอร์มข่าวกรองสำหรับห้องข่าว — คัดกรองข่าวอัตโนมัติ สืบสวนเชิงลึก ตรวจสอบ Media จำลองสถานการณ์ และเฝ้าระวัง dark web บนเซิร์ฟเวอร์ของคุณเอง ใช้ AI ที่รันในเครื่อง ข้อมูลไม่รั่วออกนอกองค์กร
+แพลตฟอร์มข่าวกรองสำหรับห้องข่าว — สืบสวนเชิงลึก ตรวจสอบ Media เขียนรายงาน
+จำลองสถานการณ์ และเฝ้าระวัง dark web บนเซิร์ฟเวอร์ของคุณเอง ใช้ AI ที่รันในเครื่อง
+ข้อมูลไม่รั่วออกนอกองค์กร
+
+**DESK ไม่ดึงข่าวเอง** การดึง คัดกรอง จัดกลุ่ม และตรวจจับสัญญาณ อยู่ที่ **Horizon**
+ซึ่งเป็นระบบแยกอีกตัว DESK คือขั้นตอนที่คนลงมือสืบสวน
 
 ```
-ระบบทำงาน 24/7 เบื้องหลัง → นักข่าวมาเปิดเช้า → เห็นทันทีว่ามีอะไรสำคัญ
+Horizon                                   OSINT//DESK
+ดึงข่าว → คัดกรอง → จัดกลุ่ม → ตรวจจับ ──►  กล่องสัญญาณ → คดี → บทความ
+                                    ◄──  verdict กลับไปสอนเรดาร์
 ```
+
+ติดตั้ง DESK อย่างเดียวก็ใช้ได้ แต่กล่องสัญญาณจะว่างจนกว่าจะต่อ Horizon
 
 ---
 
@@ -14,16 +23,17 @@
 2. [ภาพรวมระบบ](#2-ภาพรวมระบบ)
 3. [Workflow หลัก — วงจรข่าวกรอง](#3-workflow-หลัก--วงจรข่าวกรอง)
 4. [Step 0 · Admin ตั้งระบบ](#step-0--admin-ตั้งระบบ)
-5. [Step 1 · คัดกรองข่าว (Today's Intel)](#step-1--คัดกรองข่าว-todays-intel)
-6. [Step 2 · สืบสวนเชิงลึก (Investigation)](#step-2--สืบสวนเชิงลึก-investigation)
-7. [Step 3 · ตรวจสอบ Media (Verify)](#step-3--ตรวจสอบ Media-verify)
-8. [Step 4 · เขียนรายงาน (Brief)](#step-4--เขียนรายงาน-brief)
-9. [Step 5 · จำลองสถานการณ์ (Simulation)](#step-5--จำลองสถานการณ์-simulation)
-10. [Step 6 · Dark Web Intelligence](#step-6--dark-web-intelligence)
-11. [Intelligence Features](#intelligence-features)
-12. [บทบาทผู้ใช้และสิทธิ์](#บทบาทผู้ใช้และสิทธิ์)
-13. [Services ที่ใช้งาน](#services-ที่ใช้งาน)
-14. [สำหรับ Developer](#สำหรับ-developer)
+5. [Step 1 · สัญญาณจาก Horizon](#step-1--สัญญาณจาก-horizon)
+6. [แผนที่ข่าว](#แผนที่ข่าว)
+7. [Step 2 · สืบสวนเชิงลึก (Investigation)](#step-2--สืบสวนเชิงลึก-investigation)
+8. [Step 3 · ตรวจสอบ Media (Verify)](#step-3--ตรวจสอบ-media-verify)
+9. [Step 4 · เขียนรายงาน (Brief)](#step-4--เขียนรายงาน-brief)
+10. [Step 5 · จำลองสถานการณ์ (Simulation)](#step-5--จำลองสถานการณ์-simulation)
+11. [Step 6 · Dark Web Intelligence](#step-6--dark-web-intelligence)
+12. [Intelligence Features](#intelligence-features)
+13. [บทบาทผู้ใช้และสิทธิ์](#บทบาทผู้ใช้และสิทธิ์)
+14. [Services ที่ใช้งาน](#services-ที่ใช้งาน)
+15. [สำหรับ Developer](#สำหรับ-developer)
 
 ---
 
@@ -44,7 +54,6 @@ curl http://localhost:11434/api/tags
 
 # ถ้ายังไม่ได้ pull model
 ollama pull gemma4:12b        # โมเดลหลัก — brief, vision, simulation, requirements, deception, darkweb (ต้องมี)
-ollama pull gemma4:e4b        # triage queue — เร็วกว่า ใช้ VRAM น้อยกว่า (~3 GB)
 ollama pull whisper           # ถอดเสียง audio/video (deploy.sh pull ให้อัตโนมัติ)
 ```
 
@@ -57,7 +66,7 @@ ollama pull whisper           # ถอดเสียง audio/video (deploy.sh 
 # Clone repo
 git clone <repo-url> osintdesk && cd osintdesk
 
-# รัน deploy script (interactive — ถามรหัสผ่านและ Ollama URL)
+# รัน deploy script
 ./deploy.sh
 ```
 
@@ -75,9 +84,10 @@ script จะ: ตรวจ prerequisites → ตั้งค่า .env → bui
 
 ```bash
 ./deploy.sh --update    # git pull + rebuild + migrate (zero-downtime)
-./deploy.sh --restart   # restart api + worker + worker-intel (เร็วกว่า rebuild)
+./deploy.sh --yes       # ติดตั้ง/ติดตั้งซ้ำโดยไม่ถามอะไรเลย
+./deploy.sh --restart   # โหลด .env ใหม่แล้วเริ่ม service ที่ทำงานจริง
 ./deploy.sh --ssl       # ตั้งค่า SSL ด้วย Let's Encrypt
-./deploy.sh --logs      # ดู live logs (api + worker + worker-intel + beat)
+./deploy.sh --logs      # ดู live logs (api + worker-intel + frontend)
 ./deploy.sh --status    # ดูสถานะ containers
 ./deploy.sh --down      # หยุดทุก service
 ```
@@ -102,46 +112,45 @@ OSINT//DESK แบ่งการทำงานเป็น **2 ชั้น** 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ชั้นอัตโนมัติ (ทำงานเบื้องหลัง 24/7)                       │
+│  Horizon (คนละ repo คนละสแตก)                               │
 │                                                             │
-│  RSS / Webhook / API → คัดกรอง AI → ให้คะแนน → แจ้งเตือน  │
-│  Celery Beat ดึงข้อมูลทุก 60 วินาที                         │
+│  ดึงข่าว → คัดกรอง → dedup → จัดกลุ่ม → ตรวจจับสัญญาณ      │
 └─────────────────────────────────────────────────────────────┘
-                           ↓ ป้อนข้อมูลให้
+              │ POST /api/v1/signals/inbound
+              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  ชั้นผู้ใช้ (นักข่าว / นักวิเคราะห์ทำงาน)                  │
+│  OSINT//DESK — ที่ที่คนทำงาน                                │
 │                                                             │
-│  Today's Intel → Investigation → Verify → Brief            │
+│  กล่องสัญญาณ → Investigation → Verify → Brief              │
+│  แผนที่ข่าว   → คดี → verdict กลับไปหา Horizon             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+ทั้งสองต่อกันด้วย HTTP อย่างเดียว ไม่แชร์ฐานข้อมูลและไม่แชร์เน็ตเวิร์ก — Horizon
+ล่ม DESK ไม่กระทบ DESK ล่ม Horizon retry ให้เอง
 
 ### การไหลของข้อมูล
 
 ```
-แหล่งข่าว (RSS / Webhook / Dark Web)
+Horizon ตรวจเจอสัญญาณ (weak signal / trend breakout)
     │
     ▼
-Adapter ดึงข้อมูล + แปลงเป็น CanonicalFeedItem
-    │
-    ├─── [Reliability] Admiralty Code A-F / 1-6 แปะทุก item ทันที
+POST /api/v1/signals/inbound   (X-API-Key, idempotent ตาม signal_id)
     │
     ▼
-Redis Queue
+external_signals — สถานะ pending_review, ยังไม่เปิดคดีเอง
+    │
+    ├─── จับคู่ "ประเด็นที่เราตามอยู่" (คิว intel ไม่ใช่บนคำขอ HTTP)
+    ├─── สถานที่ในข่าว → พิกัด → แผนที่
     │
     ▼
-Celery Worker
+นักวิเคราะห์กด "รับ" → เปิดคดีพร้อมหลักฐานจาก top_events
     │
     ▼
-LLM ให้คะแนน 7 เกณฑ์ + จัด Verdict (PRIORITY / FAST_TRACK / INVESTIGATE / PASS)
-    │
-    ├─── [Requirements] auto-match กับ PIR ที่เปิดอยู่
-    │
-    ▼
-PostgreSQL (feed_items)
-    │
-    ▼
-API → Frontend (Today's Intel)
+ปิดคดีพร้อม verdict → POST กลับไป Horizon (คิว intel, retry 30s→2m→10m→1h)
 ```
+
+**สัญญาณไม่เคยเปิดคดีเอง** — คนเป็นคนตัดสิน นี่เป็นข้อกำหนดของสเปก ไม่ใช่ข้อจำกัด
 
 ---
 
@@ -207,7 +216,7 @@ Admin → Settings → แท็บ Sources → [+ เพิ่มแหล่�
 Admin → Settings → แท็บ AI
 - Ollama URL:          http://host.docker.internal:11434
 - Default Model:       gemma4:12b
-- Triage Model:        gemma4:e4b  (fast — triage queue เท่านั้น)
+- Triage Model:        gemma4:e4b  (ค้างไว้ — การคัดกรองย้ายไป Horizon แล้ว)
 - Brief Model:         gemma4:12b
 - Vision Model:        gemma4:12b  (keyframe analysis, verify)
 - Simulation Model:    gemma4:12b
@@ -244,10 +253,70 @@ Intelligence → PIR → [+ สร้าง PIR ใหม่]
 
 ---
 
-## Step 1 · คัดกรองข่าว (Today's Intel)
+## Step 1 · สัญญาณจาก Horizon
 
-**ผู้ใช้:** นักข่าว / บรรณาธิการ  
+**ผู้ใช้:** นักข่าว / บรรณาธิการ
 **เวลา:** เปิดมาเช้า และตรวจซ้ำระหว่างวัน
+
+หน้านี้คือกล่องขาเข้าจาก Horizon แบ่งบนสุดเป็นสองแท็บ เพราะเป็นคนละคำถาม:
+
+| แท็บ | คืออะไร |
+|---|---|
+| **ประเด็นที่เราตามอยู่** | วาระของกองบรรณาธิการเอง แยกเป็นกล่องตามประเด็นที่ตั้งไว้ |
+| **ข่าวที่ไหลเข้ามาเอง** | สิ่งที่เรดาร์ส่งมาโดยไม่ตรงประเด็นไหน — ไม่ได้แปลว่าไม่สำคัญ แค่ยังไม่มีใครขอ |
+
+### ตั้งประเด็นที่ติดตามก่อนอย่างอื่น
+
+Horizon ส่งทุกอย่างที่เรดาร์จับได้ เพราะมันไม่รู้ว่ากองบรรณาธิการนี้ตามเรื่องอะไร
+และมันไม่ควรรู้ — ความสนใจเชิงบรรณาธิการเปลี่ยนทุกสัปดาห์ ถ้าไม่ตั้งประเด็น ข่าวที่
+รออยู่จะกองปนกับนัดชิงฟุตบอล
+
+กด **"สร้างประเด็นใหม่"** แล้วเขียนว่าตามหาข่าวแบบไหน เช่น
+*"เหตุรุนแรง ระเบิด ยิง วางเพลิง ในปัตตานี ยะลา นราธิวาส รวมถึงปฏิบัติการของหน่วย
+ความมั่นคงและขบวนการในพื้นที่"*
+
+**ช่องคำอธิบายคือช่องที่ทำงานจริง** หมวดที่เลือกเป็นแค่บริบท ไม่ใช่ตัวตัดสิน —
+ข่าวปะทะที่นราธิวาสเคยเข้ามาติดป้ายว่า `ต่างประเทศ` และเข้ากล่องถูกเพราะคำอธิบาย
+
+### รับ หรือ ตีกลับ
+
+- **รับ** → เปิดคดีพร้อมหลักฐานจาก `top_events` และลิงก์กลับไปหาสัญญาณต้นทาง
+- **ตีกลับ** → ต้องบอกว่าเป็นการปฏิเสธแบบไหน:
+
+| | ความหมาย | Horizon เอาไปทำอะไร |
+|---|---|---|
+| **ไม่ใช่เรื่องที่เราติดตาม** | ข่าวถูก แต่ไม่ใช่ประเด็นของเรา | ไม่นับว่าตรวจจับผิด |
+| **ข่าวผิดพลาด** | การตรวจจับพลาดจริง | ใช้ปรับเกณฑ์การตรวจจับ |
+
+ความต่างนี้สำคัญ: เดิมการตีกลับทุกครั้งรายงานว่า `false_signal` ซึ่งแปลว่า
+**บรรณาธิการที่เคลียร์ข่าวนอกประเด็นกำลังสอนเรดาร์ให้กดการตรวจจับที่ทำงานถูกอยู่แล้ว**
+
+### คลิกประเด็นแล้วได้สรุป ไม่ใช่รายการที่แคบลง
+
+ไทม์ไลน์ประกอบจาก `top_events` ของสัญญาณเอง ตรวจย้อนกับการ์ดข้างล่างได้ ส่วนบรรทัด
+"ขยับไปทางไหน" เป็นของโมเดล จึงแยกบล็อกและติดป้ายว่าใครเป็นคนพูด
+
+---
+
+## แผนที่ข่าว
+
+สถานที่ที่ Horizon สกัดจากข่าว แปลงเป็นพิกัดด้วย Wikidata แล้วปักบนแผนที่
+(Leaflet + OpenStreetMap — ไม่ส่งข้อมูลว่ากองบรรณาธิการสนใจที่ไหนให้ผู้ให้บริการ
+เชิงพาณิชย์)
+
+- **หมุดคือสถานที่ ไม่ใช่เหตุการณ์** พร้อมจำนวนบนหมุด — สิบหมุดบนจุดเดียวอ่านเป็น
+  สัญญาณรบกวน หมุดเดียวที่บอกว่าสิบอ่านเป็นรูปแบบ
+- `"จ.กาฬสินธุ์"` `"จังหวัดกาฬสินธุ์"` `"กาฬสินธุ์"` รวมเป็นหมุดเดียวด้วย Q-number
+- ใต้แผนที่บอกว่ายังปักไม่ได้กี่เหตุการณ์ — แผนที่ที่ขาดข้อมูลไปหนึ่งในสามอย่าง
+  เงียบ ๆ แย่กว่าแผนที่ที่บอกว่ามันขาด
+
+---
+
+## Today's Intel (ของเดิม — การคัดกรองย้ายไป Horizon แล้ว)
+
+หน้านี้และ Autopilot ด้านล่างสร้างไว้ตอนที่ DESK ยังดึงข่าวเอง ตอนนี้การดึงและ
+คัดกรองอยู่ที่ Horizon ทั้งหมด หน้านี้จึงว่างในการติดตั้งใหม่ โค้ดยังอยู่และยังใช้
+ได้ถ้าเปิด adapter เอง แต่ไม่ใช่ทางหลักอีกต่อไป
 
 ### สิ่งที่เห็นหน้า Today's Intel
 
@@ -737,6 +806,7 @@ C = Consistent (สนับสนุน) / I = Inconsistent (ขัดแย้
 | Service | Port | หน้าที่ |
 |---|---|---|
 | **nginx** | **80 / 443** | **Reverse proxy — entry point หลัก** |
+| **Horizon** | 8300 (คนละสแตก) | **ต้นทางของข่าวทั้งหมด** — ไม่ได้อยู่ใน compose นี้ |
 | Frontend | — (ผ่าน nginx) | UI หลัก |
 | API | 8000 | Backend (FastAPI) — `/docs` สำหรับ Swagger |
 | PostgreSQL | — (internal) | ฐานข้อมูลหลัก |
@@ -752,6 +822,12 @@ C = Consistent (สนับสนุน) / I = Inconsistent (ขัดแย้
 | MiroFish UI | 5003 | Simulation frontend |
 | n8n | 5678 | Workflow automation |
 | Tor proxy | 9050 | SOCKS5 สำหรับ dark web (isolated network) |
+
+**ที่มีงานทำจริง:** `api` · `worker-intel` · `frontend` · `nginx` · `postgres` · `redis`
+
+`worker` (คิว `triage`) กับ `beat` ยังอยู่ใน compose แต่ไม่มีงานแล้ว — การดึงข่าว
+ย้ายไป Horizon และ `beat_schedule` ว่างเปล่า **อะไรที่ผู้ใช้นั่งรอผลต้องส่งเข้าคิว
+`intel` เสมอ** งานที่ถูกส่งเข้าคิวที่ไม่มี worker ฟังจะค้างเงียบ ไม่มี error
 
 ### ตรวจสุขภาพระบบ
 
@@ -770,12 +846,12 @@ http://localhost:8000/docs         (API Swagger — ทดสอบ endpoint โ
 ```bash
 # Dev stack (hot reload, source mounts)
 docker compose -f docker-compose.dev.yml up -d
-docker compose -f docker-compose.dev.yml logs -f api worker worker-intel beat
+docker compose -f docker-compose.dev.yml logs -f api worker-intel frontend
 docker compose -f docker-compose.dev.yml ps
 
 # Production
 ./deploy.sh --status    # สถานะ containers
-./deploy.sh --logs      # live logs (api + worker + worker-intel + beat)
+./deploy.sh --logs      # live logs (api + worker-intel + frontend)
 ./deploy.sh --update    # git pull + rebuild + migrate
 
 # Makefile shortcuts (dev)
@@ -791,7 +867,7 @@ make seed-dev       # seed development data
 make install        # ./deploy.sh (first-time)
 make update         # ./deploy.sh --update
 make prod-migrate   # alembic upgrade head (production container)
-make prod-logs      # docker compose logs -f api worker worker-intel beat
+make prod-logs      # docker compose logs -f api worker-intel frontend
 
 # Worker queues
 # osint-worker      → triage queue  (8 workers, gemma4:e4b) — feed ingestion, scoring

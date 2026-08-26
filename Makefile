@@ -1,4 +1,4 @@
-.PHONY: up down build logs test test-unit lint type-check migrate migrate-create seed-dev install update restart ssl
+.PHONY: up down build logs test test-unit lint type-check migrate migrate-create seed-dev install install-yes update restart ssl
 
 DEV  = docker compose -f docker-compose.dev.yml
 PROD = docker compose -f docker-compose.yml
@@ -12,13 +12,15 @@ down:
 	$(DEV) down
 
 build:
-	$(DEV) build api worker frontend
+	$(DEV) build api worker-intel frontend
 
 logs:
-	$(DEV) logs -f api worker
+	$(DEV) logs -f api worker-intel
 
+# force-recreate, not restart: get_settings() is lru_cached, so a plain restart
+# runs on the old environment while looking like it worked.
 restart-api:
-	$(DEV) restart api worker
+	$(DEV) up -d --force-recreate api worker-intel
 
 # ── Testing ────────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,10 @@ seed-dev:
 install:
 	@bash deploy.sh
 
+# One command, no questions: generates what is missing and prints it at the end.
+install-yes:
+	@bash deploy.sh --yes
+
 update:
 	@bash deploy.sh --update
 
@@ -67,7 +73,7 @@ ssl:
 	@bash deploy.sh --ssl
 
 prod-logs:
-	$(PROD) logs -f api worker beat
+	$(PROD) logs -f api worker-intel frontend
 
 prod-status:
 	$(PROD) ps
