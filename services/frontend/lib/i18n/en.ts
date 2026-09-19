@@ -126,6 +126,7 @@ const en: TranslationKeys = {
     profile_question_hint: "This field does the work — a clash in Narathiwat arrived labelled ต่างประเทศ and landed correctly because of it",
     profile_categories_hint: "Optional. Narrows which signals this profile is considered for — it never decides. The description above decides. None set = considered for everything.",
     profile_add: "Add profile",
+    profile_save_failed: "Could not save:",
     profile_delete_hint: "Delete. Signals in this box move to the unsorted box; nothing is deleted with it.",
     profile_edit: "Edit profile",
     profile_save: "Save changes",

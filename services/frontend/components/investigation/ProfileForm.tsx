@@ -53,6 +53,9 @@ export function ProfileForm({
 
   const canSave = name.trim().length > 0 && description.trim().length > 0;
   const busy = create.isPending || update.isPending;
+  // Saving used to fail in silence: the panel stayed open with the text still in
+  // it and nothing said why, which is indistinguishable from a dead button.
+  const error = (create.error ?? update.error)?.message ?? null;
 
   function save() {
     if (!canSave) return;
@@ -124,6 +127,12 @@ export function ProfileForm({
         </div>
         <p className="text-[10px] text-[var(--text-3)]">{t("signals.profile_categories_hint")}</p>
       </div>
+
+      {error && (
+        <p className="rounded-lg bg-[var(--red)]/10 px-3 py-2 text-[11px] text-[var(--red)]">
+          {t("signals.profile_save_failed")} {error}
+        </p>
+      )}
 
       <div className="flex gap-2 pt-1">
         <button

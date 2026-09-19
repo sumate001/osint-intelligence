@@ -1,3 +1,5 @@
+import { useAuthStore } from "@/lib/stores/auth";
+
 // Use relative URL so requests go through Next.js proxy (next.config.mjs rewrites /api/* → backend)
 // Falls back to absolute URL for server-side rendering if needed
 const API_BASE =
@@ -47,6 +49,17 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
     headers,
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
+
+  // A token the server rejects is not a session. AuthGuard only ever checked
+  // that a token existed, so without this the app stays "logged in" while every
+  // request fails — which reads as the feature being broken, not as being
+  // logged out. This is exactly what a SECRET_KEY rotation produces.
+  if (response.status === 401 && typeof window !== "undefined") {
+    useAuthStore.getState().logout();
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+  }
 
   if (!response.ok) {
     const text = await response.text();
