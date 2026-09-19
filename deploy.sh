@@ -127,9 +127,13 @@ case "${1:-}" in
     ok "Build เสร็จ"
     echo ""
     info "Restart services..."
+    # force-recreate on all three: _ensure_var above may have just added vars,
+    # and a container that is merely restarted keeps the environment it started
+    # with. worker-intel had this; api and frontend did not.
     docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate worker-intel
-    docker compose -f "$COMPOSE_FILE" up -d --no-deps api
-    docker compose -f "$COMPOSE_FILE" up -d --no-deps frontend nginx
+    docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate api
+    docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate frontend
+    docker compose -f "$COMPOSE_FILE" up -d --no-deps nginx
     echo ""
     info "รัน database migrations..."
     sleep 5
@@ -217,6 +221,12 @@ if [ ! -f "$ENV_FILE" ]; then
 else
   ok ".env มีอยู่แล้ว"
 fi
+
+# What .env looked like before this run touched it. Compose does not treat a
+# changed env_file as a reason to recreate a container, so without comparing
+# this ourselves an edit below lands in the file and never reaches the running
+# process — see the force-recreate at "เริ่ม services".
+ENV_SUM_BEFORE=$(md5sum "$ENV_FILE" 2>/dev/null | cut -d" " -f1)
 
 # เพิ่ม vars ใหม่ที่อาจขาดใน .env เก่า (idempotent)
 _ensure_var() {
@@ -373,6 +383,21 @@ ok "Build เสร็จ"
 echo ""
 info "เริ่ม services ทั้งหมด..."
 docker compose -f "$COMPOSE_FILE" up -d
+
+# `up -d` starts what is missing but leaves a running container alone when only
+# env_file *contents* changed — compose compares the file list, not the values.
+# So a re-run that rotates SECRET_KEY reported success while the API kept
+# signing JWTs with the old key. It cost three weeks of a live system running
+# on the placeholder key that ships in the public repo, with nothing wrong on
+# screen. get_settings() is lru_cached too, so `restart` would not be enough:
+# only a new container reads the new value.
+if [ "$FIRST_INSTALL" != true ]; then
+  ENV_SUM_AFTER=$(md5sum "$ENV_FILE" 2>/dev/null | cut -d" " -f1)
+  if [ "$ENV_SUM_BEFORE" != "$ENV_SUM_AFTER" ]; then
+    info ".env เปลี่ยน — สร้าง $LIVE_SERVICES ใหม่เพื่อให้ค่าใหม่มีผลจริง"
+    docker compose -f "$COMPOSE_FILE" up -d --force-recreate $LIVE_SERVICES
+  fi
+fi
 echo ""
 
 # ── 6. Health checks ─────────────────────────────────────────────────

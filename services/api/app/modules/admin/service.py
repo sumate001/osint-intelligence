@@ -161,10 +161,23 @@ async def check_health(settings_merged: AllSettings) -> list[ServiceHealth]:
         ("SearXNG",      "http://searxng:8080/"),
         ("Neo4j",        "http://neo4j:7474"),
         ("SpiderFoot",   "http://spiderfoot:5001/"),
-        ("MiroFish",     "http://mirofish:5001/health"),
         ("Perplexica",   "http://perplexica:3000/"),
         ("n8n",          "http://n8n:5678/healthz"),
     ]
+
+    # MiroFish is off by default and that is the documented, correct setup: with
+    # MIROFISH_URL unset the simulation module uses its LLM fallback, and turning
+    # the service on additionally requires a Zep graph workflow. Reporting it red
+    # for being deliberately unconfigured says something is broken when nothing
+    # is, which is how a real failure gets lost among the noise.
+    if get_settings().mirofish_url:
+        core_http.append(("MiroFish", "http://mirofish:5001/health"))
+    else:
+        results.append(ServiceHealth(
+            name="MiroFish",
+            status="disabled",
+            detail="ไม่ได้เปิดใช้ — simulation ใช้ LLM fallback (ตั้ง MIROFISH_URL เพื่อเปิด)",
+        ))
     async with httpx.AsyncClient(timeout=3.0) as client:
         for name, url in core_http:
             t0 = time.monotonic()

@@ -138,7 +138,7 @@ NEO4J_URI               # bolt://localhost:7687
 REDIS_URL               # redis://localhost:6379/0
 MINIO_ENDPOINT          # localhost:9000  (NO http:// prefix — code prepends it)
 SEARXNG_URL             # http://localhost:8080
-PERPLEXICA_URL          # http://localhost:3002  (Vane image — root / returns 200, /api/health returns 404)
+PERPLEXICA_URL          # http://localhost:3002  (root / returns 200, /api/health returns 404)
 SPIDERFOOT_URL          # http://localhost:5001
 # MIROFISH_URL — leave unset to use LLM fallback; set to http://localhost:5002 only if Zep graph workflow is configured
 SECRET_KEY              # JWT signing key
@@ -174,7 +174,9 @@ result = await chat_json(messages, module="module_name", model=effective_model)
 - Abort: `GET /stopscan?id={scanId}`
 - **Target types**: SpiderFoot accepts domain, IP, or email ONLY — not full URLs (`https://...`) and not plain entity names ("Australia"). Extract `netloc` from URL with `urlparse`, strip `www.`, validate with domain regex before passing as target.
 
-**Perplexica / Vane image**: health check is `GET /` (200 OK) — `/api/health` returns 404
+**Perplexica**: health check is `GET /` (200 OK) — `/api/health` returns 404. Pinned to
+`itzcrazykns1337/perplexica:main`, not the `vane` rebrand it used to use: same service and
+same `/api/search`, but vane unpacks to 13.1GB against ~2GB and took a 39GB host to 100%.
 
 **MinIO**: `MINIO_ENDPOINT` must NOT have `http://` prefix — code in `verify/router.py` prepends it
 
@@ -235,7 +237,7 @@ result = await chat_json(messages, module="module_name", model=effective_model)
 | minio | 9000/9001 | object storage |
 | ollama | 11434 | local LLM inference |
 | searxng | 8080 | meta search engine |
-| perplexica | 3002 | AI research assistant (Vane image — health check GET /, not /api/health) |
+| perplexica | 3002 | AI research assistant (health check GET /, not /api/health) |
 | spiderfoot | 5001 | OSINT scanner |
 | mirofish | 5002 | simulation API (LLM fallback used when MIROFISH_URL unset) |
 | mirofish-ui | 5003 | simulation frontend |

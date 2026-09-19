@@ -242,12 +242,16 @@ services:
     restart: unless-stopped
 
   perplexica:
-    image: itzcrazykns1337/vane:latest
+    # Upstream, not the `vane` rebrand this used to pin. Same service and the
+    # same /api/search that requirements/tasks.py calls, but vane unpacks to
+    # 13.1GB against upstream's ~2GB — on a 39GB host that one image took the
+    # disk to 100% and left no room for Postgres to write.
+    image: itzcrazykns1337/perplexica:main
     container_name: osint-perplexica
     ports:
       - "3002:3000"
     volumes:
-      - perplexica-data:/home/vane/data
+      - perplexica-data:/home/perplexica/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

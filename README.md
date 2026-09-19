@@ -816,7 +816,7 @@ C = Consistent (สนับสนุน) / I = Inconsistent (ขัดแย้
 | MinIO | 9001 | Object storage console (API internal) |
 | Ollama | 11434 | LLM inference (รันบน host ไม่อยู่ใน compose) |
 | SearXNG | — (internal) | Meta search engine (research panel) |
-| Perplexica | **3002** | AI research assistant (Vane image) |
+| Perplexica | **3002** | AI research assistant |
 | SpiderFoot | 5001 | OSINT scanner |
 | MiroFish backend | 5002 | Simulation API |
 | MiroFish UI | 5003 | Simulation frontend |

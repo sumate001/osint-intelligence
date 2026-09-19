@@ -183,7 +183,7 @@ class UserUpdate(BaseModel):
 
 class ServiceHealth(BaseModel):
     name: str
-    status: str   # ok / error / unknown
+    status: str   # ok / error / disabled / unknown
     latency_ms: float | None = None
     detail: str = ""
 
