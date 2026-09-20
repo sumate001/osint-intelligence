@@ -65,10 +65,14 @@ async def receive_signal(data: SignalInbound, db=Depends(get_db)):
     """
     signal, created = await service.ingest(db, data)
     await db.commit()
-    if created:
+    if created and signal.profile_id is None:
         # Queued, not awaited: filing needs the model, and Horizon is holding
         # this request open. A slow answer here becomes a delivery timeout and a
         # retry on their side.
+        #
+        # Skipped entirely for a beat_match, which arrives already filed against
+        # the beat the newsroom defined. Asking our model to re-judge it would
+        # spend a call to maybe contradict the reason shown to the editor.
         file_into_profile.delay(str(signal.id))
     return SignalInboundAck(osint_signal_id=str(signal.id))
 
@@ -140,6 +144,33 @@ async def list_profiles(db=Depends(get_db), _: dict = Depends(get_current_user))
         SignalProfileOut(**SignalProfileIn.model_validate(p, from_attributes=True).model_dump(),
                          id=p.id, pending=pending)
         for p, pending in await service.list_profiles(db)
+    ]
+
+
+@router.get("/profiles/active", dependencies=[Depends(require_horizon_key)])
+async def active_profiles_for_horizon(db=Depends(get_db)):
+    """The beats Horizon should be watching for, read with the inbound key.
+
+    This is the half of the integration that was missing. A beat used to be a
+    filter applied to whatever the detectors happened to send, so a newsroom
+    could define "อิสราเอลในประเทศไทย", and 90 matching events could sit in
+    Horizon, and not one would travel — nothing asked for them. Horizon only
+    dispatches what it finds anomalous, which is 2.5% of what it knows.
+
+    Deliberately a pull, not a push. If OSINT//DESK is down Horizon keeps its
+    last answer and carries on; nothing here has to retry, and no new outbound
+    dependency is added to the side that holds the editorial data.
+    """
+    return [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            # The free text is what the model actually reads, on both sides.
+            "description": p.description,
+            "categories": p.categories or [],
+        }
+        for p, _ in await service.list_profiles(db)
+        if p.active
     ]
 
 

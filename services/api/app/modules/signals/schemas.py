@@ -42,7 +42,11 @@ class SignalInbound(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     signal_id: uuid.UUID
-    signal_type: Literal["weak_signal", "trend_breakout"]
+    #: weak_signal and trend_breakout are detections — the engine noticed
+    #: something. beat_match is a request being served: this newsroom asked to
+    #: follow the subject and Horizon found an event on it. They are graded
+    #: differently, so they must not arrive looking the same.
+    signal_type: Literal["weak_signal", "trend_breakout", "beat_match"]
     title: str
     combined_score: float = Field(ge=0.0, le=1.0)
     trend_score: float
@@ -54,6 +58,13 @@ class SignalInbound(BaseModel):
     #: Null for a weak signal raised on a single unclustered event.
     cluster_id: uuid.UUID | None = None
     scenario_id: uuid.UUID | None = None
+    #: Set only on beat_match: which beat was matched, and why. Horizon has
+    #: already decided, so filing skips the model rather than asking twice.
+    #: The name is carried so a signal still reads correctly after the beat is
+    #: renamed or deleted.
+    beat_id: uuid.UUID | None = None
+    beat_name: str | None = None
+    beat_reason: str | None = None
     created_at: datetime
 
 

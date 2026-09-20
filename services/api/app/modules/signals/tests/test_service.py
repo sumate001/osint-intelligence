@@ -59,6 +59,11 @@ def inbound_body(**overrides) -> dict:
     body = {
         "signal_id": "3f1a1c8e-4a2b-4f31-9c1e-8b0f2a6d7e55",
         "signal_type": "weak_signal",
+        # Present and null: this is a detection. Always emitting them means the
+        # receiver never has to tell "absent" from "not set".
+        "beat_id": None,
+        "beat_name": None,
+        "beat_reason": None,
         "title": "สัญญาณอ่อนด้านพลังงานในภาคตะวันออก",
         "combined_score": 0.72,
         "trend_score": 0.0,
@@ -335,3 +340,76 @@ def test_the_worker_is_recognised_by_how_celery_starts_it():
     from app.core import db
 
     assert db.IS_WORKER == ("celery" in sys.argv[0])
+
+
+# ── beat_match: a request being served, not a detection ─────────────────────
+
+
+def test_the_contract_allows_a_beat_match():
+    """Both repos read this file; if either renames the type the other fails
+    here rather than going quiet in production."""
+    schema = json.loads(
+        (CONTRACTS / "signal_inbound.schema.json").read_text(encoding="utf-8")
+    )
+
+    assert "beat_match" in schema["properties"]["signal_type"]["enum"]
+    for field in ("beat_id", "beat_name", "beat_reason"):
+        assert field in schema["properties"]
+        assert field in schema["required"]
+
+
+def test_the_inbound_model_accepts_a_beat_match():
+    from app.modules.signals.schemas import SignalInbound
+
+    signal = SignalInbound(
+        signal_id=uuid.uuid4(),
+        signal_type="beat_match",
+        title="อิสราเอลขยายพื้นที่ตั้งถิ่นฐานเขต E1",
+        combined_score=0.0,
+        trend_score=0.0,
+        categories=["ต่างประเทศ"],
+        summary="มีการรายงานการขยายพื้นที่ในเขต E1",
+        top_events=[],
+        force_assessments=[],
+        cluster_id=None,
+        scenario_id=None,
+        beat_id=uuid.uuid4(),
+        beat_name="อิสราเอลในประเทศไทย",
+        beat_reason="เป็นความเคลื่อนไหวที่ประเด็นนี้ติดตามอยู่",
+        created_at=datetime.now(timezone.utc),
+    )
+
+    assert signal.signal_type == "beat_match"
+    assert signal.beat_id is not None
+
+
+def test_a_detection_still_validates_without_beat_fields():
+    """The three fields are nullable, so nothing about existing detections
+    changes — a Horizon that has not deployed yet keeps working."""
+    from app.modules.signals.schemas import SignalInbound
+
+    signal = SignalInbound(
+        signal_id=uuid.uuid4(),
+        signal_type="weak_signal",
+        title="สัญญาณอ่อน",
+        combined_score=0.3,
+        trend_score=0.0,
+        created_at=datetime.now(timezone.utc),
+    )
+
+    assert signal.beat_id is None
+    assert signal.beat_name is None
+
+
+def test_a_beat_match_skips_the_model_and_a_detection_does_not():
+    """Horizon has already decided which beat this is on. Re-deciding here
+    would spend a model call to possibly contradict the reason shown to the
+    editor right beside it."""
+    import inspect
+
+    from app.modules.signals import router
+
+    source = inspect.getsource(router.receive_signal)
+
+    assert "signal.profile_id is None" in source
+    assert "file_into_profile.delay" in source

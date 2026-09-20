@@ -141,6 +141,23 @@ async def ingest(db: AsyncSession, data: SignalInbound) -> tuple[ExternalSignal,
         )
         return existing, False
 
+    # A beat_match is already filed: the newsroom asked for this subject and
+    # Horizon matched it there. Re-deciding with our own model would only add a
+    # chance of disagreeing with the reason we are about to show the editor.
+    # The beat is verified against our own table rather than trusted, so a
+    # renamed or deleted beat degrades to unsorted instead of dangling.
+    beat_id = None
+    beat_reason = None
+    if data.signal_type == "beat_match" and data.beat_id is not None:
+        if await db.get(SignalProfile, data.beat_id) is not None:
+            beat_id = data.beat_id
+            beat_reason = data.beat_reason
+        else:
+            log.warning(
+                "beat_match names a profile we do not have — filing it unsorted",
+                extra={"signal_id": str(data.signal_id), "beat_id": str(data.beat_id)},
+            )
+
     signal = ExternalSignal(
         source_system="horizon",
         signal_id=data.signal_id,
@@ -148,6 +165,8 @@ async def ingest(db: AsyncSession, data: SignalInbound) -> tuple[ExternalSignal,
         title=data.title,
         payload=data.model_dump(mode="json"),
         status="pending_review",
+        profile_id=beat_id,
+        profile_reason=beat_reason,
         received_at=_now(),
     )
     db.add(signal)
