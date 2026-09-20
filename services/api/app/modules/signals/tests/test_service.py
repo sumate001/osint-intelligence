@@ -6,6 +6,7 @@ these fail rather than the integration silently going quiet in production.
 """
 import json
 import os
+import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -297,3 +298,40 @@ def test_a_genuine_detection_error_can_still_be_reported():
     """Relevance and accuracy are both real answers; the point is telling them
     apart, not replacing one with the other."""
     assert SignalDismiss(reason="ข่าวปลอม", verdict="false_signal").verdict == "false_signal"
+
+
+# ── Celery workers must not share a pooled connection across event loops ─────
+
+
+def _engine_pool(monkeypatch, is_worker):
+    from app.core import db
+
+    monkeypatch.setattr(db, "IS_WORKER", is_worker)
+    return db._make_engine().pool
+
+
+def test_a_worker_gets_an_engine_that_pools_nothing(monkeypatch):
+    """Each task runs asyncio.run(), so a pooled connection outlives the loop
+    that opened it and reaches the next task already dead. It only fails when a
+    task happens to reuse one, which is why it read as flakiness rather than as
+    a bug: "Event loop is closed", intermittently, on a task that was fine a
+    minute ago."""
+    from sqlalchemy.pool import NullPool
+
+    assert isinstance(_engine_pool(monkeypatch, True), NullPool)
+
+
+def test_the_api_keeps_its_pool(monkeypatch):
+    """One long-lived loop serves every request there, so pooling is correct and
+    worth keeping — the fix must not cost the API a connection per query."""
+    from sqlalchemy.pool import NullPool
+
+    assert not isinstance(_engine_pool(monkeypatch, False), NullPool)
+
+
+def test_the_worker_is_recognised_by_how_celery_starts_it():
+    """compose runs `celery -A app.worker worker ...`, so argv[0] is the marker.
+    If that command ever changes, this is the line that has to change with it."""
+    from app.core import db
+
+    assert db.IS_WORKER == ("celery" in sys.argv[0])
