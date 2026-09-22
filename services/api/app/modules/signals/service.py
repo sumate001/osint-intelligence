@@ -191,6 +191,7 @@ async def ingest(db: AsyncSession, data: SignalInbound) -> tuple[ExternalSignal,
 #: own word because SQL cannot express "IS NULL" through a uuid query parameter,
 #: and because that box is a real destination rather than an absence.
 UNSORTED = "unsorted"
+FILED = "filed"
 
 
 async def list_signals(
@@ -208,6 +209,13 @@ async def list_signals(
         count_query = count_query.where(ExternalSignal.status == status)
     if profile == UNSORTED:
         clause = ExternalSignal.profile_id.is_(None)
+        query, count_query = query.where(clause), count_query.where(clause)
+    elif profile == FILED:
+        # Everything that matched some beat, without naming one. This is what
+        # the beats tab shows before an editor picks a beat: no filter at all
+        # would mix in the unsorted box, which is the other tab and a different
+        # question.
+        clause = ExternalSignal.profile_id.is_not(None)
         query, count_query = query.where(clause), count_query.where(clause)
     elif profile:
         clause = ExternalSignal.profile_id == uuid.UUID(profile)

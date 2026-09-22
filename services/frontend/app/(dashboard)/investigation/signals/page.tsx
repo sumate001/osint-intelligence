@@ -284,12 +284,17 @@ export default function SignalsInboxPage() {
   const [tab, setTab] = useState<SignalStatus | "all">("pending_review");
 
   const { data: profiles = [] } = useSignalProfiles();
-  // Default to the first beat rather than to nothing: an empty selection would
-  // show every beat's signals at once, which is the mixture we just separated.
-  const current = beat || profiles[0]?.id || "";
+  // Nothing is selected until an editor selects it. Defaulting to the first
+  // beat meant opening this page always mounted its brief, and a brief is a
+  // model writing a chronology — a minute or more on this hardware — so the
+  // page hung on arrival to answer a question nobody had asked yet.
+  //
+  // "filed" rather than no filter: the empty state still has to mean "the
+  // beats", not "the beats and the unsorted box", which is the other tab.
+  const current = beat;
   const { data, isLoading } = useSignals(
     tab === "all" ? undefined : tab,
-    view === "inbound" ? "unsorted" : current || undefined,
+    view === "inbound" ? "unsorted" : current || "filed",
   );
   const signals = data?.items ?? [];
   const following = profiles.reduce((n, p) => n + p.pending, 0);
@@ -338,7 +343,7 @@ export default function SignalsInboxPage() {
             <>
               <BeatBar
                 selected={current}
-                onSelect={setBeat}
+                onSelect={(id) => setBeat((was) => (was === id ? "" : id))}
                 onNew={openNew}
                 onEdit={openEdit}
               />
@@ -354,8 +359,18 @@ export default function SignalsInboxPage() {
                 </div>
               )}
               {/* The brief is the reading; the cards below are the record. An
-                  editor needs to be able to get from one to the other. */}
+                  editor needs to be able to get from one to the other.
+
+                  Only for the beat that was actually picked: writing one is a
+                  model call, so mounting it for whichever beat happened to sort
+                  first made every visit to this page pay for a chronology
+                  nobody had asked to read. */}
               {current && !formOpen && <ProfileBrief profileId={current} />}
+              {!current && !formOpen && profiles.length > 0 && (
+                <p className="text-[11px] text-[var(--text-3)]">
+                  {t("signals.pick_beat_hint")}
+                </p>
+              )}
             </>
           ) : (
             <p className="text-[11px] text-[var(--text-3)]">{t("signals.inbound_hint")}</p>

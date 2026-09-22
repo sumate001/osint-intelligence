@@ -488,3 +488,14 @@ def test_the_suite_does_not_put_a_live_model_on_the_ingest_path():
     import os
 
     assert os.environ["SIGNAL_PROFILE_MATCHING"] == "false"
+
+
+def test_the_beats_tab_can_ask_for_filed_signals_without_naming_a_beat():
+    """The page opens with no beat selected, because selecting one mounts its
+    brief and a brief is a model writing a chronology. It still has to mean
+    "the beats" and not "the beats and the unsorted box", which is the other
+    tab — so there is a word for it."""
+    from app.modules.signals.service import FILED, UNSORTED
+
+    assert FILED == "filed"
+    assert FILED != UNSORTED

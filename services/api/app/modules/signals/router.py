@@ -122,7 +122,11 @@ async def feed_counts(_: dict = Depends(get_current_user)):
 async def list_signals(
     status: str | None = Query(None),
     profile: str | None = Query(
-        None, description='profile id, or "unsorted" for signals that matched none'
+        None,
+        description=(
+            'profile id; "unsorted" for signals that matched no beat; '
+            '"filed" for everything that matched one, without naming it'
+        ),
     ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),

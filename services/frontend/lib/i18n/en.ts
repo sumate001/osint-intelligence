@@ -133,6 +133,7 @@ const en: TranslationKeys = {
     profile_pending: "{n} awaiting review — click to show only this box",
     filed_because: "Filed here because:",
     brief_reading: "The model\u2019s reading \u2014 check it against the timeline below",
+    pick_beat_hint: "Pick a beat above to read how its situation has moved.",
     brief_situation: "How the situation moved",
     brief_source: "source",
     brief_timeline: "Timeline from the signals in this box",
