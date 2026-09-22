@@ -135,6 +135,24 @@ class BriefEvent(BaseModel):
     signal_id: uuid.UUID
 
 
+class SituationStep(BaseModel):
+    """One move in the story, written rather than quoted.
+
+    The old brief pasted the reports themselves in date order, which is a
+    reading list: an editor still had to work out what had actually changed
+    between one and the next. This says what moved, and `refs` points at the
+    reports it rests on so the claim stays checkable — the model writes the
+    sentence, never the evidence under it.
+    """
+
+    when: str
+    #: What changed at this point, in Thai. Not a restatement of a headline.
+    change: str
+    #: Positions in `timeline` backing this step. Empty means the model wrote
+    #: something nothing supports, and the step is dropped before it is served.
+    refs: list[int] = []
+
+
 class ProfileBrief(BaseModel):
     """What has been happening on this beat.
 
@@ -149,6 +167,9 @@ class ProfileBrief(BaseModel):
     #: Newest first, deduplicated across signals — the same event reaches us
     #: through several signals when a story keeps growing.
     timeline: list[BriefEvent]
+    #: The situation as it developed, oldest first — the model's reading of the
+    #: timeline below it, not a second copy of it.
+    situation: list[SituationStep] = []
     places: list[str]
     #: The model's reading of the beat, or None when there is nothing to read.
     developments: str | None = None

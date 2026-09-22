@@ -413,3 +413,78 @@ def test_a_beat_match_skips_the_model_and_a_detection_does_not():
 
     assert "signal.profile_id is None" in source
     assert "file_into_profile.delay" in source
+
+
+# ── the beat brief: a reading of the story, not a reading list ──────────────
+
+
+def test_a_step_with_no_citation_is_dropped():
+    """Every step has to point at reports the editor can open. One citing
+    nothing is the model narrating rather than reading — and on a beat page
+    that is indistinguishable from reporting."""
+    from app.modules.signals.service import _situation_from
+
+    kept = _situation_from(
+        [
+            {"when": "ต้นเดือน ก.ย.", "change": "สถานการณ์ตึงขึ้น", "refs": [1]},
+            {"when": "กลางเดือน", "change": "ไม่มีอะไรรองรับ", "refs": []},
+        ],
+        timeline_length=3,
+    )
+
+    assert [s["change"] for s in kept] == ["สถานการณ์ตึงขึ้น"]
+
+
+def test_a_citation_outside_the_timeline_is_dropped_not_clamped():
+    """Guessing which report was meant is how a sentence ends up attached to a
+    story it is not about."""
+    from app.modules.signals.service import _situation_from
+
+    assert _situation_from([{"when": "x", "change": "y", "refs": [99]}], timeline_length=3) == []
+
+
+def test_citations_are_returned_as_timeline_positions():
+    """The model counts from 1 because that is what it was shown; the UI indexes
+    from 0. Getting this wrong points every step at its neighbour."""
+    from app.modules.signals.service import _situation_from
+
+    kept = _situation_from([{"when": "x", "change": "y", "refs": [1, 3]}], timeline_length=3)
+
+    assert kept[0]["refs"] == [0, 2]
+
+
+def test_a_malformed_answer_costs_the_reading_not_the_page():
+    """The timeline is worth showing on its own — it always was."""
+    from app.modules.signals.service import _situation_from
+
+    assert _situation_from(None, 3) == []
+    assert _situation_from("ไม่ใช่รายการ", 3) == []
+    assert _situation_from([{"change": "ไม่มี refs"}], 3) == []
+
+
+def test_the_prompt_asks_for_a_summary_rather_than_the_headlines_back():
+    """The reports are already on the page below it. Restating them is the
+    failure this replaced."""
+    from app.modules.signals.service import BRIEF_SYSTEM
+
+    assert "ไม่ใช่การแปะข่าวเรียงตามวันที่" in BRIEF_SYSTEM
+    assert "ห้ามคัดลอกหัวข้อข่าวมาเป็นคำตอบ" in BRIEF_SYSTEM
+
+
+def test_the_signals_module_has_a_timeout_that_matches_the_hardware():
+    """It fell through to the 120s default while a warm answer on this host
+    takes 64–120s and a cold one took 222 — so the brief came back empty with a
+    200, which reads as "nothing to say" rather than "never answered"."""
+    from app.core.llm import TIMEOUT_BY_MODULE
+
+    assert TIMEOUT_BY_MODULE["signals"] >= 240.0
+    assert TIMEOUT_BY_MODULE["default"] >= 240.0
+
+
+def test_the_suite_does_not_put_a_live_model_on_the_ingest_path():
+    """conftest used setdefault, and the api container — where this suite is
+    normally run — already sets it true. The line did nothing, and every ingest
+    test called the model."""
+    import os
+
+    assert os.environ["SIGNAL_PROFILE_MATCHING"] == "false"

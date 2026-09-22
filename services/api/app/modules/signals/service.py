@@ -282,9 +282,21 @@ BRIEF_SYSTEM = """คุณคือบรรณาธิการที่ส�
 ไม่ใช่เล่าซ้ำว่าเกิดอะไรขึ้นบ้าง ถ้าหลายข่าวเป็นเรื่องเดียวกันให้รวบเป็นเส้นเดียว
 ถ้าข้อมูลยังน้อยเกินกว่าจะบอกทิศทางได้ ให้พูดตรง ๆ ว่ายังบอกไม่ได้ — อย่าเดา
 
+**situation คือการสรุปสถานการณ์ที่เรียงตามเวลา ไม่ใช่การแปะข่าวเรียงตามวันที่**
+ผู้ใช้เห็นรายการข่าวดิบอยู่แล้วข้างล่าง สิ่งที่ต้องการจากคุณคือ *เกิดอะไรขึ้น
+ระหว่างข่าวหนึ่งกับข่าวถัดไป* — สถานการณ์เคลื่อนจากจุดไหนไปจุดไหน
+เรียงจากเก่าไปใหม่ 3-6 ช่วง ข่าวหลายชิ้นที่เป็นความเคลื่อนไหวเดียวกันรวบเป็นช่วงเดียว
+ห้ามคัดลอกหัวข้อข่าวมาเป็นคำตอบ ถ้าเขียนได้แค่ว่า "มีข่าว X" แปลว่ายังไม่ได้สรุปอะไร
+
+refs คือหมายเลขข่าวที่รองรับข้อความนั้น ต้องมีอย่างน้อยหนึ่งหมายเลขเสมอ
+ใช้เฉพาะหมายเลขที่ให้มา ห้ามคิดเลขขึ้นเอง
+
 ตอบ JSON เดียวเท่านั้น:
 {"places": ["ชื่อสถานที่ที่เป็นศูนย์กลางของเรื่อง"],
- "developments": "สรุป 2-4 ประโยคภาษาไทยว่าประเด็นนี้ขยับไปทางไหน"}"""
+ "situation": [{"when": "ช่วงเวลา เช่น ต้นเดือน ก.ย. หรือ 15 ก.ย.",
+                "change": "สถานการณ์ขยับอย่างไรในช่วงนี้ ภาษาไทย 1-2 ประโยค",
+                "refs": [1, 4]}],
+ "developments": "สรุป 2-4 ประโยคภาษาไทยว่าประเด็นนี้ขยับไปทางไหนโดยรวม"}"""
 
 
 def _timeline_from(signals: list[ExternalSignal]) -> list[dict]:
@@ -349,8 +361,14 @@ async def profile_brief(db: AsyncSession, profile: SignalProfile) -> dict:
     if not signals or not get_settings().signal_profile_matching:
         return brief
 
+    # Numbered against the timeline the editor is looking at, so a claim can be
+    # traced to the reports under it. Oldest first here, because the model is
+    # being asked how the situation moved and a story read backwards is harder
+    # to reason about than one read forwards.
+    shown = brief["timeline"]
     listing = "\n".join(
-        f"- {s.title} — {(s.payload or {}).get('summary', '')}" for s in signals[:25]
+        f"{i}. [{e['when'][:10] if e['when'] else 'ไม่ระบุวันที่'}] {e['summary']}"
+        for i, e in reversed(list(enumerate(shown, 1)))
     )
     try:
         from ..admin.service import get_effective_model
@@ -363,7 +381,7 @@ async def profile_brief(db: AsyncSession, profile: SignalProfile) -> dict:
                     "content": (
                         f"ประเด็นที่ติดตาม: {profile.name}\n"
                         f"นิยามของประเด็นนี้: {profile.description}\n\n"
-                        f"ข่าวที่เข้ามาในกล่องนี้ (ใหม่ไปเก่า):\n{listing}"
+                        f"ข่าวที่เข้ามาในกล่องนี้ (เก่าไปใหม่):\n{listing}"
                     ),
                 },
             ],
@@ -377,7 +395,39 @@ async def profile_brief(db: AsyncSession, profile: SignalProfile) -> dict:
     places = answer.get("places")
     brief["places"] = [str(p) for p in places][:12] if isinstance(places, list) else []
     brief["developments"] = str(answer.get("developments") or "") or None
+    brief["situation"] = _situation_from(answer.get("situation"), len(shown))
     return brief
+
+
+def _situation_from(raw, timeline_length: int) -> list[dict]:
+    """Keep the steps the timeline actually supports, and drop the rest.
+
+    Every step has to point at reports the editor can open. A step citing
+    nothing, or citing a number that was never offered, is the model narrating
+    rather than reading — and on a beat page that is indistinguishable from
+    reporting, which is the one thing it must not be mistaken for.
+
+    Out-of-range numbers are dropped rather than clamped: guessing which report
+    was meant is how a sentence ends up attached to a story it is not about.
+    """
+    if not isinstance(raw, list):
+        return []
+    steps: list[dict] = []
+    for item in raw[:8]:
+        if not isinstance(item, dict):
+            continue
+        change = str(item.get("change") or "").strip()
+        refs = [
+            n - 1
+            for n in (item.get("refs") or [])
+            if isinstance(n, int) and 1 <= n <= timeline_length
+        ]
+        if not change or not refs:
+            continue
+        steps.append(
+            {"when": str(item.get("when") or "").strip()[:40], "change": change[:400], "refs": refs}
+        )
+    return steps
 
 
 async def pending_count(db: AsyncSession) -> int:

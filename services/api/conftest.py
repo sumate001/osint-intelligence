@@ -17,7 +17,14 @@ import os
 # defined, a signal with no category match asked the model which box it belonged
 # in — correct in production, and it took this suite from five seconds to three
 # minutes. Tests that care about that decision turn it back on themselves.
-os.environ.setdefault("SIGNAL_PROFILE_MATCHING", "false")
+#
+# Assigned, not setdefault: the api container sets SIGNAL_PROFILE_MATCHING=true,
+# which is right for the running system and meant this line did nothing when the
+# suite was run where it is normally run — inside that container. It went
+# unnoticed while the model was fast; raising the timeout to match the hardware
+# turned a slow suite into one that does not finish. A test run must not depend
+# on the environment of the process it happens to be launched from.
+os.environ["SIGNAL_PROFILE_MATCHING"] = "false"
 
 import pytest
 import pytest_asyncio

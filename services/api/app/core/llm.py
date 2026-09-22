@@ -24,11 +24,18 @@ def get_model_for_module(module: str) -> str:
     return routing.get(module, routing["default"])
 
 
+#: Measured against the inference host this runs on, not guessed: gemma4:12b
+#: only gets 1.5GB of its 8GB onto the GPU there, so a warm answer takes 64–120
+#: seconds and a cold one — the model is dropped after five minutes idle — took
+#: 222. A 120s default sat right on that edge and failed silently, which is how
+#: the beat brief came back with no reading and a 200.
 TIMEOUT_BY_MODULE: dict[str, float] = {
     "simulation": 600.0,  # simulation prompt is large; 10min ceiling
     "brief": 300.0,
+    #: Beat briefs read up to 40 reports and write a chronology from them.
+    "signals": 300.0,
     "requirements": 360.0,  # EEI generation + matching can be slow when LLM is busy
-    "default": 120.0,
+    "default": 300.0,
 }
 
 

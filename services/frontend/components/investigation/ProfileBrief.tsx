@@ -18,6 +18,14 @@ import { useT } from "@/lib/hooks/useT";
  * visually apart from the part that is simply true.
  */
 
+/** One move in the story, written by the model, citing the reports under it. */
+type SituationStep = {
+  when: string;
+  change: string;
+  /** Indices into `timeline` — what this sentence rests on. */
+  refs: number[];
+};
+
 type BriefEvent = {
   when: string | null;
   summary: string;
@@ -30,6 +38,7 @@ type Brief = {
   profile: { id: string; name: string; description: string };
   signals_total: number;
   timeline: BriefEvent[];
+  situation: SituationStep[];
   places: string[];
   developments: string | null;
   sources: string[];
@@ -89,6 +98,46 @@ export function ProfileBrief({ profileId }: { profileId: string }) {
             {t("signals.brief_reading")}
           </p>
           <p className="text-sm text-[var(--text-2)]">{data.developments}</p>
+        </div>
+      )}
+
+      {/* The reading comes first and the reports sit under it. Before this the
+          page led with the reports in date order, which is a reading list — the
+          editor still had to work out what had changed between one and the
+          next, which is the whole job. */}
+      {data.situation?.length > 0 && (
+        <div>
+          <p className="mb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-[var(--text-3)]">
+            <Sparkles size={10} />
+            {t("signals.brief_situation")}
+          </p>
+          <ol className="space-y-2 border-l-2 border-[var(--accent)]/40 pl-3">
+            {data.situation.map((step, i) => (
+              <li key={i}>
+                <p className="font-mono text-[10px] text-[var(--text-3)]">{step.when}</p>
+                <p className="text-sm text-[var(--text)]">{step.change}</p>
+                <div className="mt-0.5 flex flex-wrap gap-1.5">
+                  {step.refs.map((ref) => {
+                    const event = data.timeline[ref];
+                    if (!event) return null;
+                    return (
+                      <a
+                        key={ref}
+                        href={event.url || undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={event.summary}
+                        className="text-[10px] text-[var(--accent)] hover:underline"
+                      >
+                        {event.source_name || t("signals.brief_source")}
+                        <ExternalLink size={9} className="ml-0.5 inline" />
+                      </a>
+                    );
+                  })}
+                </div>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
