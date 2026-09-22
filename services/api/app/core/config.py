@@ -34,16 +34,20 @@ class Settings(BaseSettings):
 
     # Ollama
     ollama_base_url: str = "http://host.docker.internal:11434"
-    ollama_default_model: str = "qwen3:8b"
+    #: One chat model for every module. The defaults used to name qwen3:8b,
+    #: qwen3:14b and gemma3:27b — none of which are on the inference host, so a
+    #: fresh install reached for models that are not there and only worked
+    #: because .env happened to override every one of them.
+    ollama_default_model: str = "gemma4:12b"
 
     # Model routing per module
-    triage_model: str = "qwen3:8b"
-    brief_model: str = "qwen3:14b"
-    vision_model: str = "gemma3:27b"
-    simulation_model: str = "qwen3:14b"
-    requirements_model: str = "qwen3:8b"
-    deception_model: str = "qwen3:8b"
-    darkweb_model: str = "qwen3:8b"
+    triage_model: str = "gemma4:12b"
+    brief_model: str = "gemma4:12b"
+    vision_model: str = "gemma4:12b"
+    simulation_model: str = "gemma4:12b"
+    requirements_model: str = "gemma4:12b"
+    deception_model: str = "gemma4:12b"
+    darkweb_model: str = "gemma4:12b"
     whisper_model: str = "whisper"
 
     # Auth
